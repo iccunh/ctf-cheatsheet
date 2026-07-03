@@ -72,6 +72,81 @@ else:
     print("unsat")
 ```
 
+### BitVec Patterns
+
+```python
+u8  = BitVec('u8', 8)
+u32 = BitVec('u32', 32)
+u64 = BitVec('u64', 64)
+
+s.add((u32 + 0x1337) == BitVecVal(0xdeadbeef, 32))
+s.add((u32 ^ 0x41414141) == 0x12345678)
+s.add(LShR(u32, 7) == 0x1234)      # unsigned right shift
+s.add(Extract(15, 8, u32) == 0x41) # byte/bit slice
+s.add(ZeroExt(24, u8) + 1 == u32)  # unsigned widen
+s.add(SignExt(24, u8) < 0)         # signed widen
+```
+
+### Rotates / Endian
+
+```python
+x = BitVec('x', 64)
+s.add(RotateLeft(x, 13) ^ 0xfeedface == 0x1337133713371337)
+s.add(RotateRight(x, 7) == 0x1122334455667788)
+
+le32 = Concat(xs[3], xs[2], xs[1], xs[0])
+be32 = Concat(xs[0], xs[1], xs[2], xs[3])
+s.add(le32 == 0x67616c66) # b"flag" little endian
+```
+
+### Common Constraints
+
+```python
+# prefix
+for i, c in enumerate(b"flag{"):
+    s.add(xs[i] == c)
+
+# checksum
+s.add(Sum([ZeroExt(24, x) for x in xs]) == 0x9ab)
+
+# xor chain
+for i in range(n - 1):
+    s.add((xs[i] ^ xs[i + 1]) == known[i])
+
+# symbolic table lookup
+table = [0x63, 0x7c, 0x77, 0x7b]
+idx = xs[0]
+val = BitVecVal(table[0], 8)
+for i, t in enumerate(table):
+    val = If(idx == i, BitVecVal(t, 8), val)
+s.add(val == 0x77)
+```
+
+### Multiple Solutions
+
+```python
+while s.check() == sat:
+    m = s.model()
+    out = bytes(m.eval(x, model_completion=True).as_long() for x in xs)
+    print(out)
+    s.add(Or([x != m.eval(x, model_completion=True) for x in xs]))
+```
+
+### Debug / Pitfalls
+
+```python
+print(s.sexpr())
+print(s.model())
+print(simplify(expr))
+s.push(); s.add(test); print(s.check()); s.pop()
+s.set("timeout", 5000)
+```
+
+* Use `BitVec`, not `Int`, for xor/shift/overflow.
+* Use `LShR` for C unsigned right shift.
+* Use `m.eval(x, model_completion=True)` when model values are missing.
+* Mask Python concrete arithmetic if you emulate fixed-width code outside Z3.
+
 ### References
 
 * [https://sylvie.fyi/posts/bloatware/](https://sylvie.fyi/posts/bloatware/)

