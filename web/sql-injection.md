@@ -1,6 +1,6 @@
 # SQL Injection
 
-## Fast Payloads
+## Try
 
 ```sql
 ' OR '1'='1'-- -
@@ -19,10 +19,6 @@
 | MySQL | `information_schema`, `sleep`, `benchmark`, `substring`, `database()` |
 | PostgreSQL | `pg_catalog`, `version()`, `substring`, `pg_sleep` |
 | MSSQL | `sys.tables`, `WAITFOR DELAY`, `TOP 1`, `SUBSTRING` |
-
-## NoSQL?
-
-{% embed url="https://hacktricks.boitatech.com.br/pentesting-web/nosql-injection" %}
 
 ## Recon
 

