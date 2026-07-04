@@ -1,8 +1,8 @@
 # Gadgets
 
-### Finding Gadgets
+## Finding Gadgets
 
-#### ROPgadget (CLI tool)
+### ROPgadget (CLI tool)
 
 ```bash
 # Install
@@ -27,7 +27,7 @@ ROPgadget --binary ./binary > gadgets.txt
 ROPgadget --binary ./libc.so.6 > libc_gadgets.txt
 ```
 
-#### pwntools ROP class
+### pwntools ROP class
 
 ```python
 from pwn import *
@@ -55,9 +55,9 @@ pop_rdi = rop.rdi.address if hasattr(rop, 'rdi') else ...
 rop.gadgets['pop rdi']          # may raise KeyError
 ```
 
-### Finding Symbols / Addresses
+## Finding Symbols / Addresses
 
-#### pwntools ELF
+### pwntools ELF
 
 ```python
 e = ELF('./binary')
@@ -96,7 +96,7 @@ e.search(b'flag').__next__()     # find "flag"
 list(e.search(b'/bin/sh'))       # all occurrences
 ```
 
-#### Search in libc
+### Search in libc
 
 ```python
 libc = ELF('./libc.so.6')
@@ -120,9 +120,9 @@ system = libc.symbols['system']
 bin_sh = next(libc.search(b'/bin/sh\x00'))
 ```
 
-### pwntools ROP (Building Chains)
+## pwntools ROP (Building Chains)
 
-#### Automatic chain construction
+### Automatic chain construction
 
 ```python
 rop = ROP(e)
@@ -148,7 +148,7 @@ rop2.system(next(libc.search(b'/bin/sh')))
 payload2 = flat({offset: rop2.chain()})
 ```
 
-#### Manual chain
+### Manual chain
 
 ```python
 # Find gadgets
@@ -177,7 +177,7 @@ payload2 = flat({
 })
 ```
 
-#### Calling conventions (x86-64)
+### Calling conventions (x86-64)
 
 ```python
 # arg1 = rdi, arg2 = rsi, arg3 = rdx, arg4 = rcx, arg5 = r8, arg6 = r9
@@ -202,7 +202,7 @@ chain = [
 ]
 ```
 
-### one\_gadget (Magic Gadgets)
+## one\_gadget (Magic Gadgets)
 
 ```bash
 # Install
@@ -244,9 +244,9 @@ payload = flat({offset: [ret, og]})
 # Common: need rsp+0x40 == NULL → just add more padding
 ```
 
-### Common Gadget Addresses
+## Common Gadget Addresses
 
-#### x86-64 (common in libc)
+### x86-64 (common in libc)
 
 ```
 pop rdi; ret
@@ -264,7 +264,7 @@ syscall
 int 0x80                   # 32-bit syscall
 ```
 
-#### Check what's available
+### Check what's available
 
 ```python
 # Quick scan

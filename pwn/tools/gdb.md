@@ -1,6 +1,6 @@
 # GDB
 
-### Breakpoints
+## Breakpoints
 
 ```gdb
 b main                    # function
@@ -16,7 +16,7 @@ disable 1                 # disable #1 (keep it)
 enable 1                  # re-enable
 ```
 
-### Running
+## Running
 
 ```gdb
 r           # run
@@ -31,7 +31,7 @@ until 0x...               # run until address
 start       # break at main, run
 ```
 
-### Print / Examine
+## Print / Examine
 
 ```gdb
 # Print formats
@@ -58,7 +58,7 @@ x/32bx $rsp    # 32 bytes
 | w    | word (4B)     |
 | g    | giant (8B)    |
 
-### Registers & Memory
+## Registers & Memory
 
 ```gdb
 info registers     / i r    # all regs
@@ -73,7 +73,7 @@ jump *0x...
 set $rip = 0x...
 ```
 
-### Stack / Backtrace
+## Stack / Backtrace
 
 ```gdb
 bt          # backtrace
@@ -86,7 +86,7 @@ info locals # local variables
 info args   # function arguments
 ```
 
-### Searching
+## Searching
 
 ```gdb
 search /bin/sh                    # pwndbg
@@ -94,14 +94,14 @@ search-pattern /bin/sh            # gef
 find 0x7ffff7... 0x7ffff7..., "/bin/sh"
 ```
 
-### Memory Map
+## Memory Map
 
 ```gdb
 vmmap         # pwndbg/gef
 info proc map # vanilla GDB
 ```
 
-### pwndbg-specific
+## pwndbg-specific
 
 ```gdb
 telescope $rsp    # dump stack with arrows
@@ -116,7 +116,7 @@ $base             # PIE base address
 $rebase(0x1234)   # convert offset to actual addr
 ```
 
-### GDB Inline ROP
+## GDB Inline ROP
 
 ```gdb
 # After hitting breakpoint with overflow

