@@ -1,6 +1,6 @@
 # Java / Spring
 
-## SpEL Probe
+## SpEL Test
 
 ```text
 ${7*7}
