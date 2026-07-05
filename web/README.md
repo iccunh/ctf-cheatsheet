@@ -1,5 +1,7 @@
 # Web
 
+Authors: myself, ziru
+
 ## Start
 
 1. Run locally and read the source.
@@ -24,6 +26,7 @@
 | Serialized cookie / object / session | [Deserialization](deserialization.md) |
 | `__proto__`, polluted config, EJS gadget | [Prototype Pollution](prototype-pollution.md) |
 | Java EL / Spring params / Tomcat internals | [Java / Spring](java-spring.md) |
+| React Server Components / Next.js App Router | [React / Next.js](react.md) |
 | Gremlin / graph traversal eval | [Graph Query](graph-query.md) |
 | PHP wrappers, webshells, filter chains | [PHP](php.md) |
 | XML parser / SOAP / SVG upload | [XXE](xxe.md) |

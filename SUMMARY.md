@@ -1,6 +1,7 @@
 # Table of contents
 
-* [Linux](README.md)
+* [CTF Cheatsheet](README.md)
+* [Linux](linux/README.md)
   * [Useful Commands](linux/useful-commands.md)
   * [Command Injection](linux/command-injection.md)
 * [Web](web/README.md)
@@ -15,6 +16,7 @@
   * [Deserialization](web/deserialization.md)
   * [Graph Query](web/graph-query.md)
   * [Java Spring](web/java-spring.md)
+  * [React / Next.js](web/react.md)
   * [NoSQL](web/nosql.md)
   * [Prototype Pollution](web/prototype-pollution.md)
   * [Request Parsing](web/request-parsing.md)

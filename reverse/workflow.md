@@ -75,3 +75,58 @@ eb xx               ; jmp short
 * Custom CRC polynomial or custom base64 alphabet.
 * PRNG seed from time, env, PID, or file metadata.
 * Decompression or embedded payload hidden behind magic bytes.
+
+## Terraform / Declarative Validators
+
+Terraform challenge files often hide a byte transform in `locals {}` blocks and reveal only:
+
+```hcl
+output "result" {
+  value = local.ok ? "ACCESS GRANTED" : "ACCESS DENIED"
+}
+```
+
+Workflow:
+
+```text
+1. Start from the final boolean, e.g. local.ok = local.final_array == local.target_array.
+2. Build the dependency chain backward: final_array -> transform_3 -> transform_2 -> transform_1 -> var.flag.
+3. Ignore locals that do not flow into the final boolean.
+4. Invert each operation in Python.
+```
+
+Common inverse operations:
+
+```python
+# rotate / index shift
+for i, v in enumerate(target):
+    prev[(i + shift) % n] = v
+
+# prefix sums: y[i] = sum(x[:i+1]) mod 256
+prev = 0
+x = []
+for v in y:
+    x.append((v - prev) % 256)
+    prev = v
+
+# modular multiply by odd constant
+x = [(v * pow(k[i % len(k)], -1, 256)) % 256 for i, v in enumerate(y)]
+
+# permutation: y[i] = x[perm[i]]
+x = [0] * len(y)
+for i, p in enumerate(perm):
+    x[p] = y[i]
+
+# S-box
+inv_sbox = {v: i for i, v in enumerate(sbox)}
+x = [inv_sbox[v] for v in y]
+
+# additive mask
+x = [(v - mask[i % len(mask)]) % 256 for i, v in enumerate(y)]
+```
+
+Verify by writing recovered bytes as `flag=[...]` in `.tfvars` and running:
+
+```bash
+terraform apply -var-file=flag.tfvar
+```
