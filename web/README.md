@@ -16,9 +16,14 @@ Authors: myself, ziru
 | --- | --- |
 | Query string reaches SQL | [SQL Injection](sql-injection.md) |
 | Mongo / JSON query reaches DB | [NoSQL Injection](nosql.md) |
+| `/graphql`, graph API, typed queries | [GraphQL](graphql.md) |
 | Login, JWT, signed cookie, role check | [Auth](auth.md) |
 | Duplicate params, nested query, raw forward | [Request Parsing](request-parsing.md) |
+| Proxy path/header mismatch | [Proxy](proxy.md) |
+| CL/TE mismatch, poisoned next request | [Desync](desync.md) |
 | URL fetcher / preview / webhook | [SSRF](ssrf.md) |
+| Cache hit on private/dynamic response | [Cache](cache.md) |
+| WebSocket / Socket.IO messages | [WebSocket](websocket.md) |
 | File upload / image upload / write path | [Upload](upload.md) |
 | File path / download / template include | [LFI](lfi.md) |
 | Reflected/stored HTML shown to browser bot | [XSS](xss.md) |
@@ -27,6 +32,8 @@ Authors: myself, ziru
 | `__proto__`, polluted config, EJS gadget | [Prototype Pollution](prototype-pollution.md) |
 | Java EL / Spring params / Tomcat internals | [Java / Spring](java-spring.md) |
 | React Server Components / Next.js App Router | [React / Next.js](react.md) |
+| CORS, postMessage, opener, SameSite | [Browser Security](browser-security.md) |
+| Debug mode, actuator, `.env`, default secrets | [Framework Misconfig](framework-misconfig.md) |
 | Gremlin / graph traversal eval | [Graph Query](graph-query.md) |
 | PHP wrappers, webshells, filter chains | [PHP](php.md) |
 | XML parser / SOAP / SVG upload | [XXE](xxe.md) |
