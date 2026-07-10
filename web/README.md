@@ -8,7 +8,8 @@ Authors: myself, ziru
 2. Find where the flag can be read: file, DB, admin page, internal service, bot cookie.
 3. Map all inputs: query/body params, JSON, headers, cookies, path, redirects, uploaded files.
 4. Check parser gaps: duplicate params, mixed GET/POST, content type, URL parsing, encoding.
-5. Read dependency docs only after finding a suspicious sink or version.
+5. If a WAF/proxy exists, prove the bug against the origin first, then compare origin vs WAF parsing.
+6. Read dependency docs only after finding a suspicious sink or version.
 
 ## Pick The Page
 
@@ -18,8 +19,10 @@ Authors: myself, ziru
 | Mongo / JSON query reaches DB | [NoSQL Injection](nosql.md) |
 | `/graphql`, graph API, typed queries | [GraphQL](graphql.md) |
 | Login, JWT, signed cookie, role check | [Auth](auth.md) |
+| IDOR, mass assignment, reset flow, race | [API / Logic](api-logic.md) |
 | Duplicate params, nested query, raw forward | [Request Parsing](request-parsing.md) |
 | Proxy path/header mismatch | [Proxy](proxy.md) |
+| WAF block, signature bypass, origin/proxy parser mismatch | [WAF / Filter Bypass](waf.md) |
 | CL/TE mismatch, poisoned next request | [Desync](desync.md) |
 | URL fetcher / preview / webhook | [SSRF](ssrf.md) |
 | Cache hit on private/dynamic response | [Cache](cache.md) |
@@ -43,11 +46,15 @@ Authors: myself, ziru
 
 ```text
 ' OR '1'='1'-- -
+' ORDER BY 1-- -
 http://internal.:5001/
+http://127.0.0.1/
 ../../../../flag.txt
+php://filter/convert.base64-encode/resource=index.php
 {{7*7}}
 <svg/onload=alert(1)>
 ;id
+?id=1&id=2
 <!DOCTYPE root [ <!ENTITY xxe SYSTEM "file:///flag.txt"> ]>
 ```
 
@@ -60,6 +67,7 @@ content types: json/form/xml/plain
 encoding: %2e%2e%2f, double encoding, unicode case
 hostnames: localhost., internal., 127.0.0.1.
 headers: Host, X-Forwarded-Host, X-Original-URL, Referer
+WAF diff: test same payload at origin and proxy, then mutate one blocked token at a time
 ```
 
 ## References

