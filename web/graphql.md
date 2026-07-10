@@ -304,10 +304,23 @@ query{
 
 ## Tools
 
+GraphQL Cop: https://github.com/dolevf/graphql-cop
+
 ```bash
+git clone https://github.com/dolevf/graphql-cop
+cd graphql-cop
+python3 -m pip install -r requirements.txt
+python3 graphql-cop.py -t http://HOST/graphql
+python3 graphql-cop.py -t http://HOST/graphql -H '{"Authorization":"Bearer TOKEN"}'
 graphql-cop -t http://HOST/graphql
+```
+
+GraphQLmap: https://github.com/swisskyrepo/GraphQLmap
+
+```bash
 python3 -m pip install graphqlmap
 graphqlmap -u http://HOST/graphql -method POST
+graphqlmap -u http://HOST/graphql -method POST --headers '{"Authorization":"Bearer TOKEN"}'
 ```
 
 ## References

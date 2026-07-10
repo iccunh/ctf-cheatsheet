@@ -115,6 +115,8 @@ python3 scanner.py -l hosts.txt -t 20 -o results.json
 python3 scanner.py -u https://HOST -H "Cookie: session=COOKIE"
 
 # ProjectDiscovery nuclei template
+nuclei -update
+nuclei -update-templates
 nuclei -u https://HOST -t http/cves/2025/CVE-2025-55182.yaml
 
 # Next.js patch helper
@@ -125,6 +127,7 @@ Useful repos / pages:
 
 ```text
 https://github.com/assetnote/react2shell-scanner
+https://github.com/projectdiscovery/nuclei
 https://github.com/projectdiscovery/nuclei-templates/blob/main/http/cves/2025/CVE-2025-55182.yaml
 https://github.com/vercel-labs/fix-react2shell-next
 https://react2shell.com/
