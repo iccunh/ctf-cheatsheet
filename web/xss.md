@@ -106,6 +106,8 @@ popup.postMessage({type:"debug", code:"fetch('/admin').then(r=>r.text()).then(t=
 
 Use when XSS lands inside a desktop wrapper, admin bot with Node/Electron APIs, or a webview with a native bridge.
 
+For more JavaScript ways to reach `execSync`, see [Node.js](nodejs.md).
+
 Check runtime:
 
 ```js

@@ -32,6 +32,7 @@ Authors: myself, ziru
 | Reflected/stored HTML shown to browser bot | [XSS](xss.md) |
 | `{{7*7}}`, `${7*7}`, template render | [SSTI](ssti.md) |
 | Serialized cookie / object / session | [Deserialization](deserialization.md) |
+| Node eval, EJS/Pug payload, `execSync` variants | [Node.js](nodejs.md) |
 | `__proto__`, polluted config, EJS gadget | [Prototype Pollution](prototype-pollution.md) |
 | Java EL / Spring params / Tomcat internals | [Java / Spring](java-spring.md) |
 | React Server Components / Next.js App Router | [React / Next.js](react.md) |

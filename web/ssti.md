@@ -653,6 +653,8 @@ a+{{config}}@b.com
 
 ## Node Templates
 
+For more JavaScript ways to reach `execSync`, see [Node.js](nodejs.md).
+
 EJS:
 
 ```ejs
