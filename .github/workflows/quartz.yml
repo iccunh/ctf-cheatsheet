@@ -1,0 +1,65 @@
+name: Validate Quartz Cheatsheet Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Validate content preprocessor and Quartz v4 build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      QUARTZ_COMMIT: d25a6eabf96751ffca56f8a8139272def7a65041
+    steps:
+      - name: Checkout ctf-cheatsheet
+        uses: actions/checkout@v4
+        with:
+          path: repo
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run preprocessor unit tests
+        run: python3 -m unittest discover -s repo/deploy/quartz -p 'test_*.py' -v
+
+      - name: Checkout pinned Quartz v4 engine
+        uses: actions/checkout@v4
+        with:
+          repository: jackyzha0/quartz
+          ref: ${{ env.QUARTZ_COMMIT }}
+          path: quartz
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: quartz/package-lock.json
+
+      - name: Install Quartz dependencies
+        working-directory: quartz
+        run: npm ci --no-audit --no-fund
+
+      - name: Prepare content and build static site
+        run: |
+          cp repo/deploy/quartz/quartz.config.ts quartz/quartz.config.ts
+          cp repo/deploy/quartz/quartz.layout.ts quartz/quartz.layout.ts
+          python3 repo/deploy/quartz/prepare_content.py \
+            --repo-root repo \
+            --output-dir quartz/content \
+            --layout-file quartz/quartz.layout.ts
+          cd quartz
+          node ./quartz/bootstrap-cli.mjs build
+          test -f public/index.html
+          test -f public/static/contentIndex.json

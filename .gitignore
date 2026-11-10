@@ -1,0 +1,5 @@
+__pycache__/
+*.py[cod]
+.quartz-build/
+node_modules/
+public/
