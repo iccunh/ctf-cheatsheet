@@ -209,6 +209,8 @@ http://169.254.169.254.nip.io/
 http://metadata.google.internal/
 ```
 
+`nip.io` is only a static hostname-to-IP mapping. If the sink resolves the hostname twice, use DNS rebinding instead: see [DNS Rebinding](../web/ssrf.md#dns-rebinding).
+
 ## What To Loot
 
 ```text

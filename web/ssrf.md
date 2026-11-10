@@ -518,8 +518,41 @@ Burp Collaborator works the same way: generate a Collaborator domain, send it th
 | spoofed.redacted.oastify.com | `127.0.0.1` |
 | company.127.0.0.1.nip.io | `127.0.0.1` |
 
+## DNS Rebinding
+
+SSRF allowlists often resolve the hostname once, approve the IP, then hand the hostname to an HTTP client that resolves it again. An attacker-controlled DNS server can answer with a public IP during validation and an internal IP during the actual request. The same primitive works in a browser: keep the attacker hostname as the origin, serve the payload from the public IP, then rebind that hostname to an internal IP and fetch it same-origin.
+
+```text
+http://7f000001.0a000001.rbndr.us:8080/
+http://7f000001.a9fea9fe.rbndr.us/latest/meta-data/
+http://make-1.2.3.4-rebind-169.254-169.254-rr.1u.ms/
+http://make-1.2.3.4-rebindfor10s-127.0.0.1-rr.1u.ms/
+```
+
+- `rbndr.us` alternates between two hex-encoded IPv4 addresses (`7f000001` = `127.0.0.1`, `a9fea9fe` = `169.254.169.254`).
+- `1u.ms` supports `make-<IP1>-rebind-<IP2>-rr.1u.ms`; check the current syntax and timeout options before relying on it.
+- `nip.io`, `sslip.io`, and `xip.io` are static hostname-to-IP mappings, not rebinding.
+- Low TTL is not always enough: resolvers, browsers, and HTTP clients may cache or pin the first answer.
+- Multiple A records are another path: one public IP and one internal IP in the same response, then let client failover reach the internal address.
+- The target usually receives the original `Host` header. Virtual-host routing, TLS SNI, and certificate validation can break the request; plain HTTP and services that ignore `Host` are easiest.
+- Browsers may block public-to-private requests with Private Network Access (PNA), so test the target browser and scheme.
+
+Checklist:
+
+```text
+1. Does the app resolve once and connect to that IP, or resolve again?
+2. Is validation done before redirects? Re-check the final host/IP after every redirect.
+3. Are multiple A records, IPv6 AAAA, and low TTL respected?
+4. Does the HTTP client support DNS pinning or a custom resolver?
+5. Does the internal service require a specific Host header or TLS certificate?
+```
+
+Defense: resolve once, validate every returned address, connect only to the validated IP, keep the original hostname for `Host`/SNI/certificate checks, re-check on redirects and retries, and enforce egress firewall rules.
+
 ## Useful Links
 
+* [https://rbndr.us/](https://rbndr.us/)
+* [https://1u.ms/](https://1u.ms/)
 * [https://highon.coffee/blog/ssrf-cheat-sheet/](https://highon.coffee/blog/ssrf-cheat-sheet/)
 * [https://hacktricks.boitatech.com.br/pentesting-web/ssrf-server-side-request-forgery](https://hacktricks.boitatech.com.br/pentesting-web/ssrf-server-side-request-forgery)
 * [https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Server%20Side%20Request%20Forgery](https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Server%20Side%20Request%20Forgery)
