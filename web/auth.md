@@ -162,3 +162,57 @@ X-Original-URL: /admin
 X-Rewrite-URL: /admin
 X-Forwarded-Host: localhost
 ```
+
+## NULL / Zero-Value Role
+
+A database `NULL` can become the zero value of an integer in the application language. In Go, `Scan` into a plain `int` returns `converting NULL to int is unsupported`; if the handler only checks `sql.ErrNoRows` and ignores that error, the destination remains zero. If the admin role is also zero, the missing value becomes admin.
+
+```sql
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  permission_level INT   -- no DEFAULT, NULL on insert
+);
+```
+
+```go
+const (
+    PermissionAdmin = 0
+    PermissionUser  = 1
+)
+
+var perms int
+// NULL -> Scan error; if ignored, perms stays 0
+row.Scan(&id, &hash, &perms)
+```
+
+Look for non-atomic registration:
+
+```text
+INSERT user (permission_level = NULL)
+        <-- race window: login here
+UPDATE user SET permission_level = 1
+```
+
+Fire registration and many logins concurrently. A login during the window can receive an admin JWT. See [API / Logic](api-logic.md) for a race harness.
+
+## Client-Side Authorization
+
+Never trust a role or domain check that only exists in the browser:
+
+```javascript
+if (!email.endsWith("@company.example")) {
+  return showError("employees only");
+}
+```
+
+The API may accept any email, any role field, or an auto-verified account. Replay the request directly:
+
+```bash
+curl -s -X POST https://HOST/api/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"attacker@example.net","password":"Password123!"}'
+```
+
+See [Recon / OSINT](recon.md) for the full discovery chain.

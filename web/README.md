@@ -20,6 +20,7 @@ Authors: myself, ziru
 | `/graphql`, graph API, typed queries | [GraphQL](graphql.md) |
 | Login, JWT, signed cookie, role check | [Auth](auth.md) |
 | IDOR, mass assignment, reset flow, race | [API / Logic](api-logic.md) |
+| Subdomains, GitHub, Swagger, app ID, chatbot | [Recon / OSINT](recon.md) |
 | Duplicate params, nested query, raw forward | [Request Parsing](request-parsing.md) |
 | Proxy path/header mismatch | [Proxy](proxy.md) |
 | WAF block, signature bypass, origin/proxy parser mismatch | [WAF / Filter Bypass](waf.md) |
@@ -57,6 +58,13 @@ php://filter/convert.base64-encode/resource=index.php
 ;id
 ?id=1&id=2
 <!DOCTYPE root [ <!ENTITY xxe SYSTEM "file:///flag.txt"> ]>
+```
+
+```text
+/swagger /swagger-ui /openapi.json /v3/api-docs /docs
+subfinder -d DOMAIN -all
+curl 'https://crt.sh/?q=%25.DOMAIN&output=json'
+site:github.com "DOMAIN" "api_key"
 ```
 
 ## Parser Tricks

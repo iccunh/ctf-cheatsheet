@@ -83,6 +83,8 @@ http://127.0.0.1:11211/
 
 ## Cloud Metadata
 
+See [Cloud / Metadata](../cloud/metadata.md) for AWS, GCP, Azure, OCI, DigitalOcean, Alibaba, ECS, and Kubernetes credential paths.
+
 ```http
 PUT http://169.254.169.254/latest/api/token
 X-aws-ec2-metadata-token-ttl-seconds: 21600
